@@ -1,0 +1,32 @@
+## Build output
+bin/
+obj/
+
+## User-specific files
+*.user
+*.suo
+*.userosscache
+*.rsuser
+
+## IDE / VS Code
+.vs/
+.vscode/
+
+## Logs and runtime data
+logs/
+blobs/
+
+
+## Environment and secrets
+.env
+.env.*
+appsettings.Development.json
+appsettings.Local.json
+
+## EF Core
+Migrations/*Snapshot.cs
+!Migrations/AppDbContextModelSnapshot.cs
+
+## OS files
+.DS_Store
+Thumbs.db
