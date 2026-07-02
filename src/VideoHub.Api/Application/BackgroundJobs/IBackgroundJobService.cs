@@ -10,5 +10,9 @@ public interface IBackgroundJobService
 
     string QueueContinuationHelloWorld();
 
+    string QueueMediaProcessingJob(Guid jobId, Guid mediaFileId);
+
     Task ExecuteHelloWorldAsync(string jobType, CancellationToken cancellationToken = default);
+
+    Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, CancellationToken cancellationToken = default);
 }

@@ -7,7 +7,10 @@ public sealed class SubmitUploadCommandValidator : AbstractValidator<SubmitUploa
 {
     public SubmitUploadCommandValidator()
     {
-        RuleFor(command => command.FileName)
+        RuleFor(command => command.ProjectId)
+            .NotEmpty();
+
+        RuleFor(command => command.OriginalFileName)
             .NotEmpty()
             .MaximumLength(255);
 
@@ -17,5 +20,12 @@ public sealed class SubmitUploadCommandValidator : AbstractValidator<SubmitUploa
 
         RuleFor(command => command.FileSizeBytes)
             .GreaterThan(0);
+
+        RuleFor(command => command.Extension)
+            .NotEmpty()
+            .MaximumLength(20);
+
+        RuleFor(command => command.Content)
+            .NotNull();
     }
 }

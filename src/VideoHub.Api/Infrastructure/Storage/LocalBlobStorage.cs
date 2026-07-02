@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Options;
 using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Infrastructure.Options;
 
 namespace VideoHub.Api.Infrastructure.Storage;
 
@@ -6,9 +8,12 @@ public sealed class LocalBlobStorage : IBlobStorage
 {
     private readonly string rootPath;
 
-    public LocalBlobStorage(IConfiguration configuration)
+    public LocalBlobStorage(IOptions<BlobStorageOptions> options)
     {
-        rootPath = configuration["BlobStorage:LocalPath"] ?? Path.Combine(AppContext.BaseDirectory, "blobs");
+        var storageOptions = options.Value;
+        rootPath = string.IsNullOrWhiteSpace(storageOptions.LocalPath)
+            ? Path.Combine(AppContext.BaseDirectory, "blobs")
+            : storageOptions.LocalPath;
         Directory.CreateDirectory(rootPath);
     }
 

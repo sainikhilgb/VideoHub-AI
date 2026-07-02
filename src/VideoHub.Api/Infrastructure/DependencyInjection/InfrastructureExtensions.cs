@@ -29,6 +29,7 @@ public static class InfrastructureExtensions
             ?? throw new InvalidOperationException("Missing database connection string.");
 
         services.Configure<HangfireSettings>(configuration.GetSection("Hangfire"));
+        services.Configure<BlobStorageOptions>(configuration.GetSection(BlobStorageOptions.SectionName));
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString, npgsqlOptions =>
@@ -36,8 +37,17 @@ public static class InfrastructureExtensions
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
-        services.AddScoped<IBlobStorage, LocalBlobStorage>();
         services.AddScoped<ICacheService, RedisCacheService>();
+        services.AddScoped<IMediaStoragePathBuilder, MediaStoragePathBuilder>();
+        services.AddHttpClient<SupabaseBlobStorage>();
+        services.AddScoped<LocalBlobStorage>();
+        services.AddScoped<IBlobStorage>(serviceProvider =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<BlobStorageOptions>>().Value;
+            return string.Equals(options.Provider, "Supabase", StringComparison.OrdinalIgnoreCase)
+                ? serviceProvider.GetRequiredService<SupabaseBlobStorage>()
+                : serviceProvider.GetRequiredService<LocalBlobStorage>();
+        });
 
         services.AddStackExchangeRedisCache(options =>
         {

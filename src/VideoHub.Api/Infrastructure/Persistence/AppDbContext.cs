@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VideoHub.Api.Domain.Entities;
+using VideoHub.Api.Domain.Media;
 
 namespace VideoHub.Api.Infrastructure.Persistence;
 
@@ -40,6 +41,31 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<MediaFile>(entity =>
         {
+            entity.Property(mediaFile => mediaFile.Type)
+                .HasMaxLength(30);
+
+            entity.Property(mediaFile => mediaFile.Status)
+                .HasMaxLength(50);
+
+            entity.Property(mediaFile => mediaFile.OriginalFileName)
+                .HasMaxLength(255);
+
+            entity.Property(mediaFile => mediaFile.StoredFileName)
+                .HasMaxLength(255);
+
+            entity.Property(mediaFile => mediaFile.Bucket)
+                .HasMaxLength(100);
+
+            entity.Property(mediaFile => mediaFile.StoragePath)
+                .HasMaxLength(2048);
+
+            entity.Property(mediaFile => mediaFile.Extension)
+                .HasMaxLength(20);
+
+            entity.HasIndex(mediaFile => new { mediaFile.ProjectId, mediaFile.UploadedAt });
+            entity.HasIndex(mediaFile => mediaFile.StoragePath)
+                .IsUnique();
+
             entity.HasOne(mediaFile => mediaFile.Project)
                 .WithMany(project => project.MediaFiles)
                 .HasForeignKey(mediaFile => mediaFile.ProjectId)
