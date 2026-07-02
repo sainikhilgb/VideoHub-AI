@@ -1,14 +1,19 @@
 using Microsoft.EntityFrameworkCore;
-using VideoHub.Api.Infrastructure.Configuration;
 using VideoHub.Api.Application.DependencyInjection;
 using VideoHub.Api.Infrastructure.DependencyInjection;
 using VideoHub.Api.Infrastructure.Extensions;
 using VideoHub.Api.Infrastructure.Logging;
 using VideoHub.Api.Infrastructure.Middleware;
+using DotNetEnv;
+using VideoHub.Api.Infrastructure.Options;
 
-EnvFileLoader.Load(AppContext.BaseDirectory);
 
 var builder = WebApplication.CreateBuilder(args);
+// Load .env variables into the process
+Env.Load();
+
+// Merge environment variables into ASP.NET Core configuration
+builder.Configuration.AddEnvironmentVariables();
 
 builder.AddStructuredLogging();
 
@@ -29,6 +34,8 @@ builder.Services.AddProblemDetails(options =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.Configure<BlobStorageOptions>(
+    builder.Configuration.GetSection("BlobStorage"));
 
 var app = builder.Build();
 
