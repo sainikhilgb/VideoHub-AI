@@ -1,6 +1,9 @@
 namespace VideoHub.Api.Application.Commands;
 
 public sealed record SubmitUploadCommand(
-    string FileName,
+    Guid ProjectId,
+    string OriginalFileName,
     string ContentType,
-    long FileSizeBytes);
+    long FileSizeBytes,
+    string Extension,
+    Stream Content);

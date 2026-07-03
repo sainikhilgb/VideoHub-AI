@@ -21,26 +21,29 @@ public sealed class ExceptionHandlingMiddleware
         {
             await next(context);
         }
+        catch (FluentValidation.ValidationException exception)
+        {
+            logger.LogWarning(exception, "Validation failed");
+            await WriteProblemAsync(context, StatusCodes.Status400BadRequest, "Validation failed.", exception.Message);
+        }
+        catch (KeyNotFoundException exception)
+        {
+            logger.LogWarning(exception, "Resource not found");
+            await WriteProblemAsync(context, StatusCodes.Status404NotFound, "Resource not found.", exception.Message);
+        }
+        catch (HttpRequestException exception)
+        {
+            logger.LogError(exception, "Storage upload failed");
+            await WriteProblemAsync(context, StatusCodes.Status502BadGateway, "Storage upload failed.", exception.Message);
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "Unhandled exception occurred");
-
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            context.Response.ContentType = "application/problem+json";
-
-            var problemDetails = new ProblemDetails
-            {
-                Title = "An unexpected error occurred.",
-                Status = StatusCodes.Status500InternalServerError,
-                Detail = appEnvironmentMessage(context),
-                Instance = context.Request.Path
-            };
-
-            await problemDetailsService.WriteAsync(new ProblemDetailsContext
-            {
-                HttpContext = context,
-                ProblemDetails = problemDetails
-            });
+            await WriteProblemAsync(
+                context,
+                StatusCodes.Status500InternalServerError,
+                "An unexpected error occurred.",
+                appEnvironmentMessage(context));
         }
     }
 
@@ -48,4 +51,24 @@ public sealed class ExceptionHandlingMiddleware
         context.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment()
             ? "See logs for details."
             : null;
+
+    private async Task WriteProblemAsync(HttpContext context, int statusCode, string title, string? detail)
+    {
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/problem+json";
+
+        var problemDetails = new ProblemDetails
+        {
+            Title = title,
+            Status = statusCode,
+            Detail = detail,
+            Instance = context.Request.Path
+        };
+
+        await problemDetailsService.WriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = context,
+            ProblemDetails = problemDetails
+        });
+    }
 }

@@ -72,6 +72,7 @@ This structure keeps the codebase modular without splitting into multiple deploy
 - `Infrastructure/Storage`
   - `IBlobStorage`
   - `LocalBlobStorage`
+  - `SupabaseBlobStorage`
 - `Infrastructure/Caching`
   - `ICacheService`
   - `RedisCacheService`
@@ -121,6 +122,15 @@ The current data model supports the transcription workflow:
 - `POST /api/jobs/hello-world/continuation`
   - queues a continuation job chain
 
+### Media Upload
+- `POST /api/v1/projects/{projectId}/media`
+  - accepts `multipart/form-data`
+  - uploads video/audio files to the configured blob storage provider
+  - stores metadata in PostgreSQL
+  - creates a processing job record
+  - enqueues a Hangfire media-processing placeholder job
+  - returns `202 Accepted`
+
 Each endpoint returns `202 Accepted`.
 
 ## Hangfire
@@ -154,7 +164,11 @@ Important environment variables:
 - `ConnectionStrings__DefaultConnection`
 - `Redis__Configuration`
 - `Redis__InstanceName`
+- `BlobStorage__Provider`
 - `BlobStorage__LocalPath`
+- `BlobStorage__SupabaseUrl`
+- `BlobStorage__SupabaseKey`
+- `BlobStorage__BucketName`
 - `Hangfire__DashboardPath`
 - `OpenTelemetry__OtlpEndpoint`
 - `Serilog__FilePath`
@@ -165,11 +179,25 @@ Example `.env` values:
 ConnectionStrings__DefaultConnection=Host=localhost;Port=5432;Database=VideoHub;Username=postgres;Password=postgres
 Redis__Configuration=localhost:6379
 Redis__InstanceName=VideoHub:
+BlobStorage__Provider=Local
 BlobStorage__LocalPath=blobs
+BlobStorage__SupabaseUrl=
+BlobStorage__SupabaseKey=
+BlobStorage__BucketName=
 Hangfire__DashboardPath=/hangfire
 OpenTelemetry__OtlpEndpoint=
 Serilog__FilePath=logs/videohub-.log
 ```
+
+Supabase Storage is now supported through the existing `IBlobStorage` abstraction. Set `BlobStorage__Provider=Supabase` and provide the Supabase URL, service key, and bucket name to switch from local file storage to Supabase Storage.
+
+Supported upload types:
+- Video: `mp4`, `mov`, `avi`, `mkv`, `webm`
+- Audio: `mp3`, `wav`, `m4a`, `aac`, `flac`
+
+Current upload limits:
+- Video: `2 GB`
+- Audio: `500 MB`
 
 ## Running Locally
 
@@ -223,3 +251,4 @@ dotnet dev-certs https --trust
 - The project is currently a single deployable Web API with modular folders, not separate projects per layer.
 - The implementation is intentionally infrastructure-first; business feature work should build on top of this foundation.
 - `appsettings.json` is kept minimal and non-secret; secrets and environment-specific values should live in `.env` or production environment variables.
+- Authentication and project-ownership enforcement for the media upload endpoint are intentionally deferred for the next pass, per the current implementation request.

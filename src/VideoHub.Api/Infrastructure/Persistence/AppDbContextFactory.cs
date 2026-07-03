@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
-using VideoHub.Api.Infrastructure.Configuration;
 
 namespace VideoHub.Api.Infrastructure.Persistence;
 
@@ -9,7 +8,7 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
 {
     public AppDbContext CreateDbContext(string[] args)
     {
-        EnvFileLoader.Load(Directory.GetCurrentDirectory());
+        DotNetEnv.Env.Load(Directory.GetCurrentDirectory());
 
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
         var configuration = new ConfigurationBuilder()
