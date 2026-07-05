@@ -15,60 +15,193 @@ public sealed class ExceptionHandlingMiddleware
         this.problemDetailsService = problemDetailsService;
     }
 
-    public async Task InvokeAsync(HttpContext context)
+   public async Task InvokeAsync(HttpContext context)
+{
+    try
     {
-        try
+        await next(context);
+    }
+    catch (FluentValidation.ValidationException ex)
+    {
+        logger.LogWarning(ex, "Validation failed.");
+
+        await WriteProblemDetailsAsync(
+            context,
+            StatusCodes.Status400BadRequest,
+            "Validation Failed",
+            ex.Message);
+    }
+    catch (BadRequestException ex)
+    {
+        logger.LogWarning(ex, "Bad request.");
+
+        await WriteProblemDetailsAsync(
+            context,
+            StatusCodes.Status400BadRequest,
+            "Bad Request",
+            ex.Message);
+    }
+    catch (UnauthorizedException ex)
+    {
+        logger.LogWarning(ex, "Unauthorized request.");
+
+        await WriteProblemDetailsAsync(
+            context,
+            StatusCodes.Status401Unauthorized,
+            "Unauthorized",
+            ex.Message);
+    }
+    catch (ForbiddenException ex)
+    {
+        logger.LogWarning(ex, "Forbidden request.");
+
+        await WriteProblemDetailsAsync(
+            context,
+            StatusCodes.Status403Forbidden,
+            "Forbidden",
+            ex.Message);
+    }
+    catch (NotFoundException ex)
+    {
+        logger.LogWarning(ex, "Resource not found.");
+
+        await WriteProblemDetailsAsync(
+            context,
+            StatusCodes.Status404NotFound,
+            "Resource Not Found",
+            ex.Message);
+    }
+    catch (ConflictException ex)
+    {
+        logger.LogWarning(ex, "Conflict occurred.");
+
+        await WriteProblemDetailsAsync(
+            context,
+            StatusCodes.Status409Conflict,
+            "Conflict",
+            ex.Message);
+    }
+    catch (ServiceUnavailableException ex)
+    {
+        logger.LogError(ex, "Service unavailable.");
+
+        await WriteProblemDetailsAsync(
+            context,
+            StatusCodes.Status503ServiceUnavailable,
+            "Service Unavailable",
+            ex.Message);
+    }
+    catch (GatewayTimeoutException ex)
+    {
+        logger.LogError(ex, "Gateway timeout.");
+
+        await WriteProblemDetailsAsync(
+            context,
+            StatusCodes.Status504GatewayTimeout,
+            "Gateway Timeout",
+            ex.Message);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An unhandled exception occurred.");
+
+        var hostEnvironment = context.RequestServices.GetRequiredService<IHostEnvironment>();
+
+        await WriteProblemDetailsAsync(
+            context,
+            StatusCodes.Status500InternalServerError,
+            "Internal Server Error",
+            hostEnvironment.IsDevelopment()
+                ? ex.Message
+                : "An unexpected error occurred.");
+    }
+}
+
+private async Task WriteProblemDetailsAsync(
+    HttpContext context,
+    int statusCode,
+    string title,
+    string detail)
+{
+    context.Response.StatusCode = statusCode;
+
+    var problemDetails = new ProblemDetails
+    {
+        Status = statusCode,
+        Title = title,
+        Detail = detail,
+        Instance = context.Request.Path
+    };
+
+    problemDetails.Extensions["traceId"] = context.TraceIdentifier;
+
+    await problemDetailsService.WriteAsync(new ProblemDetailsContext
+    {
+        HttpContext = context,
+        ProblemDetails = problemDetails
+    });
+}
+    public sealed class NotFoundException : Exception
+    {
+        public NotFoundException(string message)
+            : base(message)
         {
-            await next(context);
-        }
-        catch (FluentValidation.ValidationException exception)
-        {
-            logger.LogWarning(exception, "Validation failed");
-            await WriteProblemAsync(context, StatusCodes.Status400BadRequest, "Validation failed.", exception.Message);
-        }
-        catch (KeyNotFoundException exception)
-        {
-            logger.LogWarning(exception, "Resource not found");
-            await WriteProblemAsync(context, StatusCodes.Status404NotFound, "Resource not found.", exception.Message);
-        }
-        catch (HttpRequestException exception)
-        {
-            logger.LogError(exception, "Storage upload failed");
-            await WriteProblemAsync(context, StatusCodes.Status502BadGateway, "Storage upload failed.", exception.Message);
-        }
-        catch (Exception exception)
-        {
-            logger.LogError(exception, "Unhandled exception occurred");
-            await WriteProblemAsync(
-                context,
-                StatusCodes.Status500InternalServerError,
-                "An unexpected error occurred.",
-                appEnvironmentMessage(context));
         }
     }
-
-    private static string? appEnvironmentMessage(HttpContext context) =>
-        context.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment()
-            ? "See logs for details."
-            : null;
-
-    private async Task WriteProblemAsync(HttpContext context, int statusCode, string title, string? detail)
+    public sealed class BadRequestException : Exception
     {
-        context.Response.StatusCode = statusCode;
-        context.Response.ContentType = "application/problem+json";
-
-        var problemDetails = new ProblemDetails
+        public BadRequestException(string message)
+            : base(message)
         {
-            Title = title,
-            Status = statusCode,
-            Detail = detail,
-            Instance = context.Request.Path
-        };
-
-        await problemDetailsService.WriteAsync(new ProblemDetailsContext
+        }
+    }
+    public sealed class ValidationException : Exception
+    {
+        public ValidationException(string message)
+            : base(message)
         {
-            HttpContext = context,
-            ProblemDetails = problemDetails
-        });
+        }
+    }
+    public sealed class UnauthorizedException : Exception
+    {
+        public UnauthorizedException(string message)
+            : base(message)
+        {
+        }
+    }
+    public sealed class ForbiddenException : Exception
+    {
+        public ForbiddenException(string message)
+            : base(message)
+        {
+        }
+    }
+    public sealed class ConflictException : Exception
+    {
+        public ConflictException(string message)
+            : base(message)
+        {
+        }
+    }
+    public sealed class InternalServerErrorException : Exception
+    {
+        public InternalServerErrorException(string message)
+            : base(message)
+        {
+        }
+    }
+    public sealed class ServiceUnavailableException : Exception
+    {
+        public ServiceUnavailableException(string message)
+            : base(message)
+        {
+        }
+    }
+    public sealed class GatewayTimeoutException : Exception
+    {
+        public GatewayTimeoutException(string message)
+            : base(message)
+        {
+        }
     }
 }

@@ -34,8 +34,6 @@ builder.Services.AddProblemDetails(options =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.Configure<BlobStorageOptions>(
-    builder.Configuration.GetSection("BlobStorage"));
 
 var app = builder.Build();
 
