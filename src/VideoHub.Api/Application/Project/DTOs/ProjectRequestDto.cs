@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 public class ProjectRequestDto
 {
-     [Required]
+    [Required]
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
@@ -12,9 +12,4 @@ public class ProjectRequestDto
 
     [Required]
     public Guid UserId { get; set; }
-
-
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-
-    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

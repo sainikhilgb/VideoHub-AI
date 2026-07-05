@@ -1,18 +1,43 @@
-
+using Microsoft.Extensions.Logging;
+using VideoHub.Api.Application.Exceptions;
 using VideoHub.Api.Domain.Entities;
-using static VideoHub.Api.Infrastructure.Middleware.ExceptionHandlingMiddleware;
+using VideoHub.Api.Infrastructure.Abstractions;
 
-public class ProjectService : IProjectService
+public sealed class ProjectService : IProjectService
 {
     private readonly IProjectRepository _projectRepository;
+    private readonly IRepository<User> _userRepository;
+    private readonly ILogger<ProjectService> _logger;
 
-    public ProjectService(IProjectRepository projectRepository)
+    public ProjectService(
+        IProjectRepository projectRepository,
+        IRepository<User> userRepository,
+        ILogger<ProjectService> logger)
     {
         _projectRepository = projectRepository;
+        _userRepository = userRepository;
+        _logger = logger;
     }
 
-    public async Task<ProjectResponseDto> CreateProjectAsync(ProjectRequestDto project)
+    public async Task<ProjectResponseDto> CreateProjectAsync(ProjectRequestDto project, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Project Creation Started: Name={Name} UserId={UserId}", project.Name, project.UserId);
+
+        var userExists = await _userRepository.GetByIdAsync(project.UserId, cancellationToken) is not null;
+        if (!userExists)
+        {
+            _logger.LogInformation("User not found, auto-creating User: UserId={UserId}", project.UserId);
+            var newUser = new User
+            {
+                Id = project.UserId,
+                Email = $"user_{project.UserId:N}@example.com",
+                Role = "User",
+                DisplayName = "Auto-Created User",
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            await _userRepository.AddAsync(newUser, cancellationToken);
+        }
+
         var newProject = await _projectRepository.CreateAsync(new Project
         {
             Name = project.Name,
@@ -20,64 +45,76 @@ public class ProjectService : IProjectService
             UserId = project.UserId,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
-        });
-        return new ProjectResponseDto
-        {
-            Id = newProject.Id,
-            Name = newProject.Name,
-            OriginalLanguage = newProject.OriginalLanguage,
-            UserId = newProject.UserId,
-            Status = newProject.Status,
-            CreatedAt = newProject.CreatedAt,
-            UpdatedAt = newProject.UpdatedAt
-        };
+        }, cancellationToken);
+
+        _logger.LogInformation("Project Creation Completed: ProjectId={ProjectId}", newProject.Id);
+
+        return MapToResponse(newProject);
     }
 
-    public async Task<bool> DeleteProjectAsync(Guid id)
+    public async Task DeleteProjectAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _projectRepository.DeleteAsync(id);
+        _logger.LogInformation("Project Deletion Started: ProjectId={ProjectId}", id);
+
+        var deleted = await _projectRepository.DeleteAsync(id, cancellationToken);
+        if (!deleted)
+            throw new NotFoundException($"Project '{id}' was not found.");
+
+        _logger.LogInformation("Project Deletion Completed: ProjectId={ProjectId}", id);
     }
 
-    public async Task<IEnumerable<ProjectResponseDto>> GetAllProjectsAsync()
+    public async Task<IEnumerable<ProjectResponseDto>> GetAllProjectsAsync(CancellationToken cancellationToken = default)
     {
-        var projects = await _projectRepository.GetAllAsync();
-        return projects.Select(p => new ProjectResponseDto
-        {
-            Id = p.Id,
-            Name = p.Name,
-            OriginalLanguage = p.OriginalLanguage,
-            Status = p.Status,
-            CreatedAt = p.CreatedAt,
-            UpdatedAt = p.UpdatedAt
-        });
+        _logger.LogInformation("Project Retrieval Started: RetrieveAll=true");
+
+        var projects = await _projectRepository.GetAllAsync(cancellationToken);
+        var result = projects.Select(MapToResponse).ToList();
+
+        _logger.LogInformation("Project Retrieval Completed: Count={Count}", result.Count);
+
+        return result;
     }
 
-    public async Task<ProjectResponseDto> GetProjectByIdAsync(Guid id)
+    public async Task<ProjectResponseDto> GetProjectByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var project = await _projectRepository.GetByIdAsync(id);
+        _logger.LogInformation("Project Retrieval Started: ProjectId={ProjectId}", id);
+
+        var project = await _projectRepository.GetByIdAsync(id, cancellationToken);
         if (project is null)
-            throw new NotFoundException("Project not found");
+            throw new NotFoundException($"Project '{id}' was not found.");
 
+        _logger.LogInformation("Project Retrieval Completed: ProjectId={ProjectId}", id);
+
+        return MapToResponse(project);
+    }
+
+    public async Task UpdateProjectAsync(Guid id, ProjectRequestDto project, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Project Update Started: ProjectId={ProjectId}", id);
+
+        var existingProject = await _projectRepository.GetByIdAsync(id, cancellationToken);
+        if (existingProject is null)
+            throw new NotFoundException($"Project '{id}' was not found.");
+
+        existingProject.Name = project.Name;
+        existingProject.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _projectRepository.UpdateAsync(id, existingProject, cancellationToken);
+
+        _logger.LogInformation("Project Update Completed: ProjectId={ProjectId}", id);
+    }
+
+    private static ProjectResponseDto MapToResponse(Project project)
+    {
         return new ProjectResponseDto
         {
             Id = project.Id,
             Name = project.Name,
             OriginalLanguage = project.OriginalLanguage,
+            UserId = project.UserId,
             Status = project.Status,
             CreatedAt = project.CreatedAt,
             UpdatedAt = project.UpdatedAt
         };
-    }
-
-    public async Task<bool> UpdateProjectAsync(Guid id, ProjectRequestDto project)
-    {
-        var existingProject = await _projectRepository.GetByIdAsync(id);
-        if (existingProject is null)
-            throw new NotFoundException("Project not found");
-
-        existingProject.Name = project.Name;
-        existingProject.UpdatedAt = DateTimeOffset.UtcNow;
-
-        return await _projectRepository.UpdateAsync(id, existingProject);
     }
 }

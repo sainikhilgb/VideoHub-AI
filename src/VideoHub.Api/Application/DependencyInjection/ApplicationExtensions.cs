@@ -14,6 +14,7 @@ public static class ApplicationExtensions
         services.AddValidatorsFromAssembly(typeof(ApplicationExtensions).Assembly);
         services.AddScoped<IBackgroundJobService, BackgroundJobService>();
         services.AddScoped<IMediaUploadService, MediaUploadService>();
+        services.AddScoped<IProjectService, ProjectService>();
         return services;
     }
 }
