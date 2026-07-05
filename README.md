@@ -38,6 +38,14 @@ This structure keeps the codebase modular without splitting into multiple deploy
   - `ProjectMediaController.cs` - Media upload endpoint
 
 ### Application
+- `Application/Exceptions`
+  - `NotFoundException.cs`
+  - `BadRequestException.cs`
+  - `UnauthorizedException.cs`
+  - `ForbiddenException.cs`
+  - `ConflictException.cs`
+  - `ServiceUnavailableException.cs`
+  - `GatewayTimeoutException.cs`
 - `Application/BackgroundJobs`
   - `IBackgroundJobService.cs`
   - `BackgroundJobService.cs`
@@ -109,11 +117,8 @@ This structure keeps the codebase modular without splitting into multiple deploy
   - `HangfireJobExecutionLoggingFilter.cs`
 - `Infrastructure/DependencyInjection`
   - `InfrastructureExtensions.cs`
-  - `PersistenceExtensions.cs`
 - `Infrastructure/Extensions`
   - `ApplicationBuilderExtensions.cs`
-- `Infrastructure/Logging`
-  - `LoggingExtensions.cs`
 - `Infrastructure/Options`
   - `BlobStorageOptions.cs`
   - `HangfireSettings.cs`
