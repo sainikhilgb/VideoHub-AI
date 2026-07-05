@@ -33,62 +33,91 @@ This structure keeps the codebase modular without splitting into multiple deploy
 
 ### API
 - `Api/Controllers`
-  - `HealthController`
+  - `HealthController.cs` - API health check
+  - `ProjectController.cs` - CRUD operations for Projects
+  - `ProjectMediaController.cs` - Media upload endpoint
 
 ### Application
-- `Application/Commands`
-  - `SubmitUploadCommand`
-- `Application/Queries`
-  - `GetJobStatusQuery`
-- `Application/DTOs`
-  - `UploadRequestDto`
-- `Application/Validators`
-  - `SubmitUploadCommandValidator`
-  - `UploadRequestDtoValidator`
 - `Application/BackgroundJobs`
-  - `IBackgroundJobService`
-  - `BackgroundJobService`
-  - `BackgroundJobsController`
+  - `IBackgroundJobService.cs`
+  - `BackgroundJobService.cs`
+  - `BackgroundJobsController.cs`
+- `Application/Commands`
+  - `SubmitUploadCommand.cs`
+- `Application/Queries`
+  - `GetJobStatusQuery.cs`
+- `Application/Project`
+  - `IProjectService.cs`
+  - `ProjectService.cs`
+  - `DTOs/ProjectRequestDto.cs`
+  - `DTOs/ProjectResponseDto.cs`
+- `Application/Uploads`
+  - `IMediaUploadService.cs`
+  - `MediaUploadService.cs`
+  - `DTOs/UploadRequestDto.cs`
+  - `DTOs/UploadMediaRequestDto.cs`
+  - `DTOs/UploadMediaResponseDto.cs`
+- `Application/Validators`
+  - `SubmitUploadCommandValidator.cs`
+  - `UploadRequestDtoValidator.cs`
+  - `UploadMediaRequestDtoValidator.cs`
 
 ### Domain
-- `User`
-- `Project`
-- `MediaFile`
-- `Transcript`
-- `TranscriptSegment`
-- `Word`
-- `Speaker`
-- `Translation`
-- `CaptionFile`
-- `Job`
-- `AuditLog`
+- `Domain/Entities`
+  - `User.cs`
+  - `Project.cs`
+  - `MediaFile.cs`
+  - `Transcript.cs`
+  - `TranscriptSegment.cs`
+  - `Word.cs`
+  - `Speaker.cs`
+  - `Translation.cs`
+  - `CaptionFile.cs`
+  - `Job.cs`
+  - `AuditLog.cs`
+- `Domain/Jobs`
+  - `JobStatuses.cs`
+  - `JobTypes.cs`
+- `Domain/Media`
+  - `MediaFileStatuses.cs`
+  - `MediaFileTypes.cs`
 
 ### Infrastructure
+- `Infrastructure/Abstractions`
+  - `IBlobStorage.cs`
+  - `ICacheService.cs`
+  - `IMediaStoragePathBuilder.cs`
+  - `IProjectRepository.cs`
+  - `IRepository.cs`
+  - `IUnitOfWork.cs`
 - `Infrastructure/Persistence`
-  - `AppDbContext`
-  - `AppDbContextFactory`
-  - `UnitOfWork`
-  - `Repositories/EfRepository`
+  - `AppDbContext.cs`
+  - `AppDbContextFactory.cs`
+  - `UnitOfWork.cs`
+  - `Repositories/EfRepository.cs`
+  - `Repositories/ProjectRepositoryService.cs`
 - `Infrastructure/Storage`
-  - `IBlobStorage`
-  - `LocalBlobStorage`
-  - `SupabaseBlobStorage`
+  - `LocalBlobStorage.cs`
+  - `MediaStoragePathBuilder.cs`
+  - `SupabaseBlobStorage.cs`
 - `Infrastructure/Caching`
-  - `ICacheService`
-  - `RedisCacheService`
+  - `RedisCacheService.cs`
 - `Infrastructure/Middleware`
-  - `CorrelationIdMiddleware`
-  - `ExceptionHandlingMiddleware`
+  - `CorrelationIdMiddleware.cs`
+  - `ExceptionHandlingMiddleware.cs`
 - `Infrastructure/BackgroundJobs`
-  - `HangfireJobExecutionLoggingFilter`
+  - `HangfireJobExecutionLoggingFilter.cs`
 - `Infrastructure/DependencyInjection`
-  - `InfrastructureExtensions`
+  - `InfrastructureExtensions.cs`
+  - `PersistenceExtensions.cs`
 - `Infrastructure/Extensions`
-  - `ApplicationBuilderExtensions`
-- `Infrastructure/Configuration`
-  - `EnvFileLoader`
+  - `ApplicationBuilderExtensions.cs`
+- `Infrastructure/Logging`
+  - `LoggingExtensions.cs`
 - `Infrastructure/Options`
-  - `HangfireSettings`
+  - `BlobStorageOptions.cs`
+  - `HangfireSettings.cs`
+  - `MediaUploadOptions.cs`
 
 ## Core Domain Model
 
@@ -110,28 +139,38 @@ The current data model supports the transcription workflow:
 
 ### Health
 - `GET /api/health`
-- Returns application health status
+  - Returns application health status
 
-### Background Jobs
-- `POST /api/jobs/hello-world`
-  - queues a fire-and-forget Hangfire job
-- `POST /api/jobs/hello-world/delayed/{delaySeconds}`
-  - queues a delayed Hangfire job
-- `POST /api/jobs/hello-world/recurring`
-  - registers a recurring Hangfire job
-- `POST /api/jobs/hello-world/continuation`
-  - queues a continuation job chain
+### Projects
+- `GET /api/v1/projects`
+  - Retrieve list of all projects
+- `GET /api/v1/projects/{id}`
+  - Retrieve a project by its unique ID
+- `POST /api/v1/projects`
+  - Create a new project using request body
+- `PUT /api/v1/projects/{id}`
+  - Update details of an existing project
+- `DELETE /api/v1/projects/{id}`
+  - Delete a project by ID
 
 ### Media Upload
 - `POST /api/v1/projects/{projectId}/media`
-  - accepts `multipart/form-data`
-  - uploads video/audio files to the configured blob storage provider
-  - stores metadata in PostgreSQL
-  - creates a processing job record
-  - enqueues a Hangfire media-processing placeholder job
-  - returns `202 Accepted`
+  - Accepts `multipart/form-data` with files
+  - Uploads video/audio files to the configured blob storage provider (Local/Supabase)
+  - Stores metadata in PostgreSQL
+  - Creates a processing job record
+  - Enqueues a Hangfire media-processing placeholder job
+  - Returns `202 Accepted`
 
-Each endpoint returns `202 Accepted`.
+### Background Jobs
+- `POST /api/jobs/hello-world`
+  - Queues a fire-and-forget Hangfire job, returns `202 Accepted`
+- `POST /api/jobs/hello-world/delayed/{delaySeconds}`
+  - Queues a delayed Hangfire job, returns `202 Accepted`
+- `POST /api/jobs/hello-world/recurring`
+  - Registers a recurring Hangfire job, returns `202 Accepted`
+- `POST /api/jobs/hello-world/continuation`
+  - Queues a continuation job chain, returns `202 Accepted`
 
 ## Hangfire
 
