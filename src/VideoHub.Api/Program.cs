@@ -1,11 +1,8 @@
-using Microsoft.EntityFrameworkCore;
 using VideoHub.Api.Application.DependencyInjection;
 using VideoHub.Api.Infrastructure.DependencyInjection;
 using VideoHub.Api.Infrastructure.Extensions;
-using VideoHub.Api.Infrastructure.Logging;
 using VideoHub.Api.Infrastructure.Middleware;
 using DotNetEnv;
-using VideoHub.Api.Infrastructure.Options;
 
 
 var builder = WebApplication.CreateBuilder(args);

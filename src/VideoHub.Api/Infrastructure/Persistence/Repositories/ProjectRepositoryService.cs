@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Infrastructure.Persistence;
 
+namespace VideoHub.Api.Infrastructure.Persistence.Repositories;
+
 public sealed class ProjectRepositoryService : IProjectRepository
 {
     private readonly AppDbContext _dbContext;
@@ -52,8 +54,7 @@ public sealed class ProjectRepositoryService : IProjectRepository
             return false;
 
         existingProject.Name = project.Name;
-        existingProject.CreatedAt = project.CreatedAt;
-        existingProject.UpdatedAt = DateTime.UtcNow;
+        existingProject.UpdatedAt = project.UpdatedAt;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

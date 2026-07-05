@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
-using VideoHub.Api.Domain.Entities;
+
+namespace VideoHub.Api.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/projects")]
-public class ProjectController : Controller
+public sealed class ProjectController : ControllerBase
 {
-
     private readonly IProjectService _projectService;
 
     public ProjectController(IProjectService projectService)
@@ -15,64 +15,46 @@ public class ProjectController : Controller
 
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<ProjectResponseDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetAllProjects()
+    public async Task<IActionResult> GetAllProjects(CancellationToken cancellationToken)
     {
-        IEnumerable<ProjectResponseDto> projects = await _projectService.GetAllProjectsAsync();
-
+        var projects = await _projectService.GetAllProjectsAsync(cancellationToken);
         return Ok(projects);
     }
 
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ProjectResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetProjectById(Guid id)
+    public async Task<IActionResult> GetProjectById(Guid id, CancellationToken cancellationToken)
     {
-        var project = await _projectService.GetProjectByIdAsync(id);
-        if (project == null)
-        {
-            return NotFound();
-        }
+        var project = await _projectService.GetProjectByIdAsync(id, cancellationToken);
         return Ok(project);
     }
 
     [HttpPost]
     [ProducesResponseType(typeof(ProjectResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateProject([FromBody] ProjectRequestDto project)
+    public async Task<IActionResult> CreateProject([FromBody] ProjectRequestDto project, CancellationToken cancellationToken)
     {
-
-        var createdProject = await _projectService.CreateProjectAsync(project);
+        var createdProject = await _projectService.CreateProjectAsync(project, cancellationToken);
         return CreatedAtAction(nameof(GetProjectById), new { id = createdProject.Id }, createdProject);
     }
-
 
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UpdateProject(Guid id, [FromBody] ProjectRequestDto project)
+    public async Task<IActionResult> UpdateProject(Guid id, [FromBody] ProjectRequestDto project, CancellationToken cancellationToken)
     {
-        var result = await _projectService.UpdateProjectAsync(id, project);
-        if (!result)
-        {
-            return NotFound();
-        }
+        await _projectService.UpdateProjectAsync(id, project, cancellationToken);
         return NoContent();
     }
 
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> DeleteProject(Guid id)
+    public async Task<IActionResult> DeleteProject(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _projectService.DeleteProjectAsync(id);
-        if (!result)
-        {
-            return NotFound();
-        }
+        await _projectService.DeleteProjectAsync(id, cancellationToken);
         return NoContent();
     }
 }

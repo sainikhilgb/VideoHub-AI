@@ -36,11 +36,8 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(project => project.User)
                 .WithMany()
                 .HasForeignKey(project => project.UserId)
+                .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.User)
-       .WithMany()
-       .HasForeignKey(x => x.UserId)
-       .IsRequired(false);
         });
 
         modelBuilder.Entity<MediaFile>(entity =>

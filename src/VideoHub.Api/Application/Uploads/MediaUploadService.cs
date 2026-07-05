@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using VideoHub.Api.Application.BackgroundJobs;
 using VideoHub.Api.Application.Commands;
 using VideoHub.Api.Application.DTOs;
+using VideoHub.Api.Application.Exceptions;
 using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Domain.Jobs;
 using VideoHub.Api.Domain.Media;
@@ -56,7 +57,7 @@ public sealed class MediaUploadService : IMediaUploadService
         var project = await projectRepository.GetByIdAsync(command.ProjectId, cancellationToken);
         if (project is null)
         {
-            throw new KeyNotFoundException($"Project '{command.ProjectId}' was not found.");
+            throw new NotFoundException($"Project '{command.ProjectId}' was not found.");
         }
 
         var mediaType = ResolveMediaType(command.Extension);

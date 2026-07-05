@@ -37,7 +37,6 @@ public static class InfrastructureExtensions
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IProjectRepository, ProjectRepositoryService>();
-        services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         services.AddScoped<ICacheService, RedisCacheService>();
         services.AddScoped<IMediaStoragePathBuilder, MediaStoragePathBuilder>();
