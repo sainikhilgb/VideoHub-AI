@@ -1,5 +1,6 @@
 using Hangfire;
 using Microsoft.Extensions.Logging;
+using VideoHub.Api.Application.Captions;
 using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Domain.Jobs;
 using VideoHub.Api.Domain.Media;
@@ -13,6 +14,8 @@ public sealed class BackgroundJobService : IBackgroundJobService
     private readonly IRecurringJobManager recurringJobManager;
     private readonly IRepository<Job> jobRepository;
     private readonly IRepository<MediaFile> mediaFileRepository;
+    private readonly IRepository<Project> projectRepository;
+    private readonly ICaptionService captionService;
     private readonly IUnitOfWork unitOfWork;
     private readonly ILogger<BackgroundJobService> logger;
 
@@ -21,6 +24,8 @@ public sealed class BackgroundJobService : IBackgroundJobService
         IRecurringJobManager recurringJobManager,
         IRepository<Job> jobRepository,
         IRepository<MediaFile> mediaFileRepository,
+        IRepository<Project> projectRepository,
+        ICaptionService captionService,
         IUnitOfWork unitOfWork,
         ILogger<BackgroundJobService> logger)
     {
@@ -28,6 +33,8 @@ public sealed class BackgroundJobService : IBackgroundJobService
         this.recurringJobManager = recurringJobManager;
         this.jobRepository = jobRepository;
         this.mediaFileRepository = mediaFileRepository;
+        this.projectRepository = projectRepository;
+        this.captionService = captionService;
         this.unitOfWork = unitOfWork;
         this.logger = logger;
     }
@@ -101,26 +108,43 @@ public sealed class BackgroundJobService : IBackgroundJobService
             return;
         }
 
+        var project = await projectRepository.GetByIdAsync(job.ProjectId, cancellationToken);
+        if (project is null)
+        {
+            logger.LogWarning("Job Failed: Project not found ProjectId={ProjectId} JobId={JobId}", job.ProjectId, jobId);
+            return;
+        }
+
         try
         {
-            job.Status = JobStatuses.Processing;
-            job.StartedAt = DateTimeOffset.UtcNow;
             mediaFile.Status = MediaFileStatuses.Processing;
+            job.StartedAt = DateTimeOffset.UtcNow;
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
-            logger.LogInformation("Processing placeholder executed for MediaId={MediaId}", mediaFileId);
+            // Resolve target languages from the job configuration, falling back to original language if none specified.
+            var targetLanguages = !string.IsNullOrWhiteSpace(job.TargetLanguages)
+                ? job.TargetLanguages.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(lang => lang.Trim()).ToList()
+                : new List<string> { project.OriginalLanguage };
 
-            job.Status = JobStatuses.Completed;
-            job.CompletedAt = DateTimeOffset.UtcNow;
-            mediaFile.Status = MediaFileStatuses.Completed;
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            await captionService.DispatchCaptionGenerationAsync(
+                jobId,
+                project.Id,
+                mediaFile.Id,
+                project.UserId,
+                mediaFile.StoragePath,
+                mediaFile.Type,
+                mediaFile.Bucket,
+                project.OriginalLanguage,
+                targetLanguages,
+                cancellationToken);
 
-            logger.LogInformation("Job Completed: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
+            logger.LogInformation("Job Dispatched: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
         }
         catch (Exception exception)
         {
             job.Status = JobStatuses.Failed;
             job.Attempts += 1;
+            job.StatusMessage = exception.Message;
             mediaFile.Status = MediaFileStatuses.Failed;
             await unitOfWork.SaveChangesAsync(cancellationToken);
 

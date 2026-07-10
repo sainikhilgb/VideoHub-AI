@@ -30,6 +30,14 @@ public static class InfrastructureExtensions
 
         services.Configure<HangfireSettings>(configuration.GetSection("Hangfire"));
         services.Configure<BlobStorageOptions>(configuration.GetSection(BlobStorageOptions.SectionName));
+        services.Configure<AiServiceOptions>(configuration.GetSection(AiServiceOptions.SectionName));
+
+        services.AddHttpClient("AiService", (sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<AiServiceOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString, npgsqlOptions =>

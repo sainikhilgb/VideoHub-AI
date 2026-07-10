@@ -20,6 +20,12 @@ public sealed class Job
 
     public int Attempts { get; set; }
 
+    [MaxLength(500)]
+    public string? StatusMessage { get; set; }
+
+    [MaxLength(200)]
+    public string TargetLanguages { get; set; } = string.Empty;
+
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
 

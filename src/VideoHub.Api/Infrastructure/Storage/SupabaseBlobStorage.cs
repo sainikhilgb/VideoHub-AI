@@ -65,4 +65,12 @@ public sealed class SupabaseBlobStorage : IBlobStorage
 
         return $"{Uri.EscapeDataString(options.BucketName!)}/{string.Join('/', encodedSegments)}";
     }
+
+    public async Task<string> EnsureFolderExistsAsync(string folderPath, CancellationToken cancellationToken = default)
+    {
+        var keepFilePath = folderPath.TrimEnd('/') + "/.keep";
+        using var emptyStream = new MemoryStream();
+        await UploadAsync(emptyStream, keepFilePath, "application/octet-stream", cancellationToken);
+        return folderPath;
+    }
 }

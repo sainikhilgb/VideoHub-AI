@@ -95,19 +95,7 @@ public sealed class MediaUploadService : IMediaUploadService
 
         mediaFile.Status = MediaFileStatuses.Uploaded;
         await mediaFileRepository.AddAsync(mediaFile, cancellationToken);
-
-        var processingJob = new Job
-        {
-            Id = Guid.NewGuid(),
-            ProjectId = project.Id,
-            Type = JobTypes.MediaProcessing,
-            Status = JobStatuses.Queued
-        };
-
-        await jobRepository.AddAsync(processingJob, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        var processingJobId = backgroundJobService.QueueMediaProcessingJob(processingJob.Id, mediaFile.Id);
 
         logger.LogInformation(
             "Upload Completed: ProjectId={ProjectId} MediaId={MediaId} StoragePath={StoragePath}",
@@ -119,8 +107,7 @@ public sealed class MediaUploadService : IMediaUploadService
             mediaFile.Id,
             project.Id,
             mediaFile.Status,
-            mediaFile.StoragePath,
-            processingJobId);
+            mediaFile.StoragePath);
     }
 
     private static string ResolveMediaType(string extension)
