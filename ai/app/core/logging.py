@@ -7,11 +7,11 @@ from contextvars import ContextVar
 from typing import Any, Generator
 
 # Context variables for structured logging
-log_context: ContextVar[dict[str, Any]] = ContextVar("log_context", default={})
+log_context: ContextVar[dict[str, Any] | None] = ContextVar("log_context", default=None)
 
 class StructuredFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        ctx = log_context.get()
+        ctx = log_context.get() or {}
         
         # Override fields if present in log record or fallback to context
         duration = getattr(record, "duration", None)
@@ -79,7 +79,8 @@ def setup_logging(level: int = logging.INFO) -> None:
 @contextmanager
 def log_operation(operation: str, extra_context: dict[str, Any] = None) -> Generator[None, None, None]:
     start_time = time.perf_counter()
-    ctx = log_context.get().copy()
+    ctx = log_context.get()
+    ctx = ctx.copy() if ctx is not None else {}
     ctx["Operation"] = operation
     if extra_context:
         ctx.update(extra_context)
@@ -91,13 +92,15 @@ def log_operation(operation: str, extra_context: dict[str, Any] = None) -> Gener
     try:
         yield
         elapsed = (time.perf_counter() - start_time) * 1000.0  # in ms
-        ctx_ended = log_context.get().copy()
+        ctx_ended = log_context.get()
+        ctx_ended = ctx_ended.copy() if ctx_ended is not None else {}
         ctx_ended["Duration"] = round(elapsed, 3)
         log_context.set(ctx_ended)
         logger.info(f"Operation completed: {operation}")
     except Exception as exc:
         elapsed = (time.perf_counter() - start_time) * 1000.0
-        ctx_ended = log_context.get().copy()
+        ctx_ended = log_context.get()
+        ctx_ended = ctx_ended.copy() if ctx_ended is not None else {}
         ctx_ended["Duration"] = round(elapsed, 3)
         log_context.set(ctx_ended)
         logger.error(f"Operation failed: {operation} — {exc}", exc_info=True)

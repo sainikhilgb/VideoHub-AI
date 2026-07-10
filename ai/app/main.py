@@ -44,7 +44,8 @@ class StructuredLoggingMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             
             elapsed = (time.perf_counter() - start_time) * 1000.0
-            ctx_ended = log_context.get().copy()
+            ctx_ended = log_context.get()
+            ctx_ended = ctx_ended.copy() if ctx_ended is not None else {}
             ctx_ended["Duration"] = round(elapsed, 3)
             ctx_ended["Operation"] = f"HTTP {request.method} {request.url.path}"
             log_context.set(ctx_ended)
@@ -55,7 +56,8 @@ class StructuredLoggingMiddleware(BaseHTTPMiddleware):
             return response
         except Exception as exc:
             elapsed = (time.perf_counter() - start_time) * 1000.0
-            ctx_ended = log_context.get().copy()
+            ctx_ended = log_context.get()
+            ctx_ended = ctx_ended.copy() if ctx_ended is not None else {}
             ctx_ended["Duration"] = round(elapsed, 3)
             ctx_ended["Operation"] = f"HTTP {request.method} {request.url.path}"
             log_context.set(ctx_ended)

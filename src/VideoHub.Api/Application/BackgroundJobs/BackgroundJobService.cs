@@ -104,11 +104,19 @@ public sealed class BackgroundJobService : IBackgroundJobService
             logger.LogInformation("Job Started: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
 
             var job = await jobRepository.GetByIdAsync(jobId, cancellationToken);
-            var mediaFile = await mediaFileRepository.GetByIdAsync(mediaFileId, cancellationToken);
-
-            if (job is null || mediaFile is null)
+            if (job is null)
             {
                 logger.LogWarning("Job Failed: Media processing references missing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
+                return;
+            }
+
+            var mediaFile = await mediaFileRepository.GetByIdAsync(mediaFileId, cancellationToken);
+            if (mediaFile is null)
+            {
+                logger.LogWarning("Job Failed: Media processing references missing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
+                job.Status = JobStatuses.Failed;
+                job.StatusMessage = $"Media file not found: {mediaFileId}";
+                await unitOfWork.SaveChangesAsync(cancellationToken);
                 return;
             }
 
@@ -116,6 +124,10 @@ public sealed class BackgroundJobService : IBackgroundJobService
             if (project is null)
             {
                 logger.LogWarning("Job Failed: Project not found ProjectId={ProjectId} JobId={JobId}", job.ProjectId, jobId);
+                job.Status = JobStatuses.Failed;
+                job.StatusMessage = $"Project not found: {job.ProjectId}";
+                mediaFile.Status = MediaFileStatuses.Failed;
+                await unitOfWork.SaveChangesAsync(cancellationToken);
                 return;
             }
 
@@ -151,7 +163,9 @@ public sealed class BackgroundJobService : IBackgroundJobService
                 {
                     job.Status = JobStatuses.Failed;
                     job.Attempts += 1;
-                    job.StatusMessage = exception.Message;
+                    job.StatusMessage = exception.Message != null && exception.Message.Length > 500
+                        ? exception.Message.Substring(0, 500)
+                        : exception.Message;
                     mediaFile.Status = MediaFileStatuses.Failed;
                     await unitOfWork.SaveChangesAsync(cancellationToken);
 

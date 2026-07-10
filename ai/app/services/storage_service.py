@@ -9,8 +9,8 @@ async def download_from_supabase(bucket: str, storage_path: str, dest_path: str)
         f"{bucket}/{storage_path}"
     )
     headers = {
-        "Authorization": f"Bearer {settings.supabase_key}",
-        "apikey": settings.supabase_key,
+        "Authorization": f"Bearer {settings.supabase_key.get_secret_value()}",
+        "apikey": settings.supabase_key.get_secret_value(),
     }
     async with httpx.AsyncClient(timeout=300) as client:
         async with client.stream("GET", url, headers=headers) as response:
@@ -27,8 +27,8 @@ async def upload_to_supabase(bucket: str, local_path: str, storage_path: str, co
         f"{bucket}/{storage_path}"
     )
     headers = {
-        "Authorization": f"Bearer {settings.supabase_key}",
-        "apikey": settings.supabase_key,
+        "Authorization": f"Bearer {settings.supabase_key.get_secret_value()}",
+        "apikey": settings.supabase_key.get_secret_value(),
         "Content-Type": content_type,
         "x-upsert": "true",
     }

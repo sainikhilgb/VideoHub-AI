@@ -22,7 +22,8 @@ async def process(request: ProcessRequest, background_tasks: BackgroundTasks):
     Returns 202 Accepted immediately and processes in the background.
     """
     # Enrich the local log context for request lifecycle logging
-    ctx = log_context.get().copy()
+    ctx = log_context.get()
+    ctx = ctx.copy() if ctx is not None else {}
     ctx.update({
         "JobId": request.job_id,
         "ProjectId": request.project_id,

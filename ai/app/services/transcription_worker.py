@@ -123,34 +123,35 @@ async def run(request: ProcessRequest) -> None:
                 # Step 2: Extract audio if video
                 if request.media_type.lower() == "video":
                     with log_operation("extract_audio"):
-                        transcription_service.extract_audio(source_path, audio_path)
+                        await asyncio.to_thread(transcription_service.extract_audio, source_path, audio_path)
                 else:
                     audio_path = source_path
 
                 # Step 3: Transcribe (single Whisper inference)
                 with log_operation("whisper_transcription"):
                     lang_hint = request.original_language if request.original_language else None
-                    detected_language, segments = transcription_service.transcribe(audio_path, lang_hint)
+                    detected_language, segments = await asyncio.to_thread(
+                        transcription_service.transcribe, audio_path, lang_hint
+                    )
 
-                # Step 4: Process all languages in parallel
-                with log_operation("process_languages", {"TargetLanguages": [l.language_code for l in request.languages]}):
-                    async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient() as client:
+                    # Step 4: Process all languages in parallel
+                    with log_operation("process_languages", {"TargetLanguages": [language.language_code for language in request.languages]}):
                         tasks = [
                             _process_language(client, request.bucket, lang, segments, dotnet_base)
                             for lang in request.languages
                         ]
                         language_results: list[LanguageResult] = await asyncio.gather(*tasks)
 
-                # Step 5: Final callback to .NET
-                with log_operation("final_callback_dotnet"):
-                    callback_url = f"{dotnet_base.rstrip('/')}{request.callback_url}"
-                    payload = ProcessCallbackPayload(
-                        detected_language=detected_language,
-                        segments=segments,
-                        language_results=language_results,
-                    )
+                    # Step 5: Final callback to .NET
+                    with log_operation("final_callback_dotnet"):
+                        callback_url = f"{dotnet_base.rstrip('/')}{request.callback_url}"
+                        payload = ProcessCallbackPayload(
+                            detected_language=detected_language,
+                            segments=segments,
+                            language_results=language_results,
+                        )
 
-                    async with httpx.AsyncClient() as client:
                         response = await client.post(
                             callback_url,
                             json=payload.model_dump(by_alias=True),
