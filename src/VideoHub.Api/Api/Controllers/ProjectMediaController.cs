@@ -105,7 +105,13 @@ public sealed class ProjectMediaController : ControllerBase
         await jobRepository.AddAsync(processingJob, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var hangfireJobId = backgroundJobService.QueueMediaProcessingJob(processingJob.Id, mediaFile.Id);
+        string? correlationId = null;
+        if (HttpContext.Items.TryGetValue(VideoHub.Api.Infrastructure.Middleware.CorrelationIdMiddleware.HeaderName, out var corrObj))
+        {
+            correlationId = corrObj?.ToString();
+        }
+
+        var hangfireJobId = backgroundJobService.QueueMediaProcessingJob(processingJob.Id, mediaFile.Id, correlationId);
 
         return Accepted(new { JobId = processingJob.Id, HangfireJobId = hangfireJobId });
     }

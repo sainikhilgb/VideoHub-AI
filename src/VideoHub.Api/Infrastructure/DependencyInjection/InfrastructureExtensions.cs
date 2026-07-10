@@ -92,6 +92,7 @@ public static class InfrastructureExtensions
                 metrics.AddOtlpExporter();
             });
 
+        services.AddHttpContextAccessor();
         return services;
     }
 
@@ -103,6 +104,7 @@ public static class InfrastructureExtensions
             .MinimumLevel.Information()
             .ReadFrom.Configuration(builder.Configuration)
             .Enrich.FromLogContext()
+            .Enrich.WithProperty("ServiceName", "VideoHub.Api")
             .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Warning)
             .WriteTo.File(logFilePath, rollingInterval: RollingInterval.Day, restrictedToMinimumLevel: LogEventLevel.Information)
             .CreateLogger();
@@ -114,6 +116,7 @@ public static class InfrastructureExtensions
                 .MinimumLevel.Information()
                 .ReadFrom.Configuration(builder.Configuration)
                 .Enrich.FromLogContext()
+                .Enrich.WithProperty("ServiceName", "VideoHub.Api")
                 .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Warning)
                 .WriteTo.File(logFilePath, rollingInterval: RollingInterval.Day, restrictedToMinimumLevel: LogEventLevel.Information);
         }, preserveStaticLogger: true, writeToProviders: false);

@@ -3,8 +3,8 @@ import tempfile
 import os
 from typing import Optional
 from faster_whisper import WhisperModel
-from app.config import settings
-from app.models import SegmentResult, WordResult
+from app.core.config import settings
+from app.models.schemas import SegmentResult, WordResult
 
 
 _model: Optional[WhisperModel] = None

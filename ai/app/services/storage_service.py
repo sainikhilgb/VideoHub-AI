@@ -1,5 +1,5 @@
 import httpx
-from app.config import settings
+from app.core.config import settings
 
 
 async def download_from_supabase(bucket: str, storage_path: str, dest_path: str) -> None:

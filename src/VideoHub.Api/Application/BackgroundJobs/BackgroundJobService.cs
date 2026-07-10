@@ -53,10 +53,10 @@ public sealed class BackgroundJobService : IBackgroundJobService
         return backgroundJobClient.Enqueue(() => ExecuteHelloWorldAsync("Fire-and-Forget", CancellationToken.None));
     }
 
-    public string QueueMediaProcessingJob(Guid jobId, Guid mediaFileId)
+    public string QueueMediaProcessingJob(Guid jobId, Guid mediaFileId, string? correlationId = null)
     {
         logger.LogInformation("Job Queued: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
-        return backgroundJobClient.Enqueue(() => ExecuteMediaProcessingAsync(jobId, mediaFileId, CancellationToken.None));
+        return backgroundJobClient.Enqueue(() => ExecuteMediaProcessingAsync(jobId, mediaFileId, correlationId, CancellationToken.None));
     }
 
     public string RegisterRecurringHelloWorld()
@@ -95,61 +95,70 @@ public sealed class BackgroundJobService : IBackgroundJobService
         }
     }
 
-    public async Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, CancellationToken cancellationToken = default)
+    public async Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, string? correlationId = null, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("Job Started: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
-
-        var job = await jobRepository.GetByIdAsync(jobId, cancellationToken);
-        var mediaFile = await mediaFileRepository.GetByIdAsync(mediaFileId, cancellationToken);
-
-        if (job is null || mediaFile is null)
+        using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
+        using (Serilog.Context.LogContext.PushProperty("JobId", jobId.ToString()))
+        using (Serilog.Context.LogContext.PushProperty("MediaId", mediaFileId.ToString()))
         {
-            logger.LogWarning("Job Failed: Media processing references missing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
-            return;
-        }
+            logger.LogInformation("Job Started: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
 
-        var project = await projectRepository.GetByIdAsync(job.ProjectId, cancellationToken);
-        if (project is null)
-        {
-            logger.LogWarning("Job Failed: Project not found ProjectId={ProjectId} JobId={JobId}", job.ProjectId, jobId);
-            return;
-        }
+            var job = await jobRepository.GetByIdAsync(jobId, cancellationToken);
+            var mediaFile = await mediaFileRepository.GetByIdAsync(mediaFileId, cancellationToken);
 
-        try
-        {
-            mediaFile.Status = MediaFileStatuses.Processing;
-            job.StartedAt = DateTimeOffset.UtcNow;
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            if (job is null || mediaFile is null)
+            {
+                logger.LogWarning("Job Failed: Media processing references missing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
+                return;
+            }
 
-            // Resolve target languages from the job configuration, falling back to original language if none specified.
-            var targetLanguages = !string.IsNullOrWhiteSpace(job.TargetLanguages)
-                ? job.TargetLanguages.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(lang => lang.Trim()).ToList()
-                : new List<string> { project.OriginalLanguage };
+            var project = await projectRepository.GetByIdAsync(job.ProjectId, cancellationToken);
+            if (project is null)
+            {
+                logger.LogWarning("Job Failed: Project not found ProjectId={ProjectId} JobId={JobId}", job.ProjectId, jobId);
+                return;
+            }
 
-            await captionService.DispatchCaptionGenerationAsync(
-                jobId,
-                project.Id,
-                mediaFile.Id,
-                project.UserId,
-                mediaFile.StoragePath,
-                mediaFile.Type,
-                mediaFile.Bucket,
-                project.OriginalLanguage,
-                targetLanguages,
-                cancellationToken);
+            using (Serilog.Context.LogContext.PushProperty("ProjectId", project.Id.ToString()))
+            {
+                try
+                {
+                    mediaFile.Status = MediaFileStatuses.Processing;
+                    job.StartedAt = DateTimeOffset.UtcNow;
+                    await unitOfWork.SaveChangesAsync(cancellationToken);
 
-            logger.LogInformation("Job Dispatched: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
-        }
-        catch (Exception exception)
-        {
-            job.Status = JobStatuses.Failed;
-            job.Attempts += 1;
-            job.StatusMessage = exception.Message;
-            mediaFile.Status = MediaFileStatuses.Failed;
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+                    // Resolve target languages from the job configuration, falling back to original language if none specified.
+                    var targetLanguages = !string.IsNullOrWhiteSpace(job.TargetLanguages)
+                        ? job.TargetLanguages.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(lang => lang.Trim()).ToList()
+                        : new List<string> { project.OriginalLanguage };
 
-            logger.LogError(exception, "Job Failed: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
-            throw;
+                    await captionService.DispatchCaptionGenerationAsync(
+                        jobId,
+                        project.Id,
+                        mediaFile.Id,
+                        project.UserId,
+                        mediaFile.StoragePath,
+                        mediaFile.Type,
+                        mediaFile.Bucket,
+                        project.OriginalLanguage,
+                        targetLanguages,
+                        correlationId,
+                        cancellationToken);
+
+                    logger.LogInformation("Job Dispatched: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
+                }
+                catch (Exception exception)
+                {
+                    job.Status = JobStatuses.Failed;
+                    job.Attempts += 1;
+                    job.StatusMessage = exception.Message;
+                    mediaFile.Status = MediaFileStatuses.Failed;
+                    await unitOfWork.SaveChangesAsync(cancellationToken);
+
+                    logger.LogError(exception, "Job Failed: Media processing JobId={JobId} MediaId={MediaId}", jobId, mediaFileId);
+                    throw;
+                }
+            }
         }
     }
 }

@@ -22,6 +22,7 @@ public sealed class CorrelationIdMiddleware
         context.Response.Headers[HeaderName] = correlationId.ToString();
 
         using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId.ToString()))
+        using (Serilog.Context.LogContext.PushProperty("RequestId", context.TraceIdentifier))
         {
             await next(context);
         }

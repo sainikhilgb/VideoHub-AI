@@ -1,4 +1,4 @@
-from app.models import SegmentResult
+from app.models.schemas import SegmentResult
 
 
 def _format_srt_time(seconds: float) -> str:

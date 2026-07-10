@@ -48,6 +48,8 @@ class ProcessRequest(CamelModel):
     original_language: str
     callback_url: str
     languages: list[LanguageTarget]
+    correlation_id: Optional[str] = None
+    request_id: Optional[str] = None
 
 
 class CaptionStatusCallback(CamelModel):

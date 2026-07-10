@@ -16,6 +16,7 @@ public interface ICaptionService
         string bucket,
         string originalLanguage,
         IReadOnlyList<string> targetLanguages,
+        string? correlationId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

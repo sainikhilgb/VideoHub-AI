@@ -29,6 +29,8 @@ public sealed class AiProcessRequest
     public string OriginalLanguage { get; set; } = string.Empty;
     public string CallbackUrl { get; set; } = string.Empty;
     public IReadOnlyList<LanguageTarget> Languages { get; set; } = [];
+    public string? CorrelationId { get; set; }
+    public string? RequestId { get; set; }
 }
 
 public sealed class LanguageTarget
