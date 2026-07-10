@@ -129,21 +129,22 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<CaptionFile>(entity =>
         {
-            entity.ToTable(table =>
-            {
-                table.HasCheckConstraint(
-                    "CK_CaptionFiles_TranscriptOrTranslation",
-                    "\"TranscriptId\" IS NOT NULL OR \"TranslationId\" IS NOT NULL");
-            });
+            entity.HasOne(captionFile => captionFile.Job)
+                .WithMany()
+                .HasForeignKey(captionFile => captionFile.JobId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasOne(captionFile => captionFile.Transcript)
                 .WithMany()
                 .HasForeignKey(captionFile => captionFile.TranscriptId)
+                .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(captionFile => captionFile.Translation)
                 .WithMany(translation => translation.CaptionFiles)
                 .HasForeignKey(captionFile => captionFile.TranslationId)
+                .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

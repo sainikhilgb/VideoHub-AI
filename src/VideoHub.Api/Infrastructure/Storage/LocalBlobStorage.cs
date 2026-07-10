@@ -37,4 +37,11 @@ public sealed class LocalBlobStorage : IBlobStorage
         await content.CopyToAsync(fileStream, cancellationToken);
         return fullPath;
     }
+
+    public Task<string> EnsureFolderExistsAsync(string folderPath, CancellationToken cancellationToken = default)
+    {
+        var fullPath = Path.Combine(rootPath, folderPath);
+        Directory.CreateDirectory(fullPath);
+        return Task.FromResult(fullPath);
+    }
 }

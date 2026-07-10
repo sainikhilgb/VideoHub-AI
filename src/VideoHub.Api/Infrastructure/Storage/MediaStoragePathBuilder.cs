@@ -15,6 +15,6 @@ public sealed class MediaStoragePathBuilder : IMediaStoragePathBuilder
             _ => "original"
         };
 
-        return $"media/{userId}/{projectId}/{folder}/{storedFileName}";
+        return $"{userId}/{projectId}/{folder}/{storedFileName}";
     }
 }

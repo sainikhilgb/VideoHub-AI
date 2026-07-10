@@ -243,6 +243,35 @@ Current upload limits:
 - Video: `2 GB`
 - Audio: `500 MB`
 
+## AI Service (Python / FastAPI)
+
+Located in the `ai` directory, this stateless AI worker handles transcription and caption generation using Faster-Whisper.
+
+### Setup and Running the AI Service
+1. **Navigate to the AI folder**:
+   ```bash
+   cd ai
+   ```
+2. **Create a virtual environment**:
+   ```bash
+   python3 -m venv .venv
+   ```
+3. **Install dependencies**:
+   ```bash
+   ./.venv/bin/pip install -r requirements.txt
+   ```
+4. **Configure environment**:
+   Create a `.env` file inside the `ai` directory containing:
+   ```bash
+   supabase_url=YOUR_SUPABASE_URL
+   supabase_key=YOUR_SUPABASE_KEY
+   dotnet_api_base_url=http://localhost:5000
+   ```
+5. **Run the development server**:
+   ```bash
+   ./.venv/bin/uvicorn main:app --reload --port 8000
+   ```
+
 ## Running Locally
 
 ### Prerequisites

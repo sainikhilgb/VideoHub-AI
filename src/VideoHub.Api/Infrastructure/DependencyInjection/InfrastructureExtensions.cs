@@ -30,6 +30,14 @@ public static class InfrastructureExtensions
 
         services.Configure<HangfireSettings>(configuration.GetSection("Hangfire"));
         services.Configure<BlobStorageOptions>(configuration.GetSection(BlobStorageOptions.SectionName));
+        services.Configure<AiServiceOptions>(configuration.GetSection(AiServiceOptions.SectionName));
+
+        services.AddHttpClient("AiService", (sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<AiServiceOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString, npgsqlOptions =>
@@ -84,6 +92,7 @@ public static class InfrastructureExtensions
                 metrics.AddOtlpExporter();
             });
 
+        services.AddHttpContextAccessor();
         return services;
     }
 
@@ -95,6 +104,7 @@ public static class InfrastructureExtensions
             .MinimumLevel.Information()
             .ReadFrom.Configuration(builder.Configuration)
             .Enrich.FromLogContext()
+            .Enrich.WithProperty("ServiceName", "VideoHub.Api")
             .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Warning)
             .WriteTo.File(logFilePath, rollingInterval: RollingInterval.Day, restrictedToMinimumLevel: LogEventLevel.Information)
             .CreateLogger();
@@ -106,6 +116,7 @@ public static class InfrastructureExtensions
                 .MinimumLevel.Information()
                 .ReadFrom.Configuration(builder.Configuration)
                 .Enrich.FromLogContext()
+                .Enrich.WithProperty("ServiceName", "VideoHub.Api")
                 .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Warning)
                 .WriteTo.File(logFilePath, rollingInterval: RollingInterval.Day, restrictedToMinimumLevel: LogEventLevel.Information);
         }, preserveStaticLogger: true, writeToProviders: false);

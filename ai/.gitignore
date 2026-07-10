@@ -1,0 +1,285 @@
+# Python virtual environment
+venv/
+.venv/
+ENV/
+.env/
+.env
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+.env.development
+.env.test
+.env.production
+
+# Logs
+*.log
+logs/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Dependency directories
+node_modules/
+
+# Distribution files
+dist/
+build/
+
+# Temporary files
+*.tmp
+temp/
+
+# Testing coverage
+.coverage
+htmlcov/
+test_results/
+.pytest_cache/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# ASGI/WSGI cache
+.cache/
+
+# uWSGI
+uwsgi.ini
+.uwsgi
+
+# Gunicorn
+gunicorn.conf.py
+
+# Alembic migrations (if you use Alembic)
+# migrations/
+# alembic.ini
+
+# Optional: If you use poetry
+poetry.lock
+poetry.toml
+
+# Optional: If you use pdm
+pdm.lock
+pdm.toml
+
+# Optional: If you use uv
+uv.lock
+uv.toml
+
+# Optional: If you use pyenv
+.python-version
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use ruff for linting
+# .ruff_cache/
+
+# Optional: If you use mypy for type checking
+# .mypy_cache/
+
+# Optional: If you use uv for dependency management
+# uv.lock
+# uv.toml
+
+# Optional: If you use pyproject.toml for dependency management
+# pyproject.toml
+# Poetry uses this for lock file, other tools may use it too
+
+# Optional: If you use r
