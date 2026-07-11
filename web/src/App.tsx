@@ -1,12 +1,25 @@
 import React from 'react'
 import { RouterProvider } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { UIProvider } from '@/app/providers/UIProvider'
 import { router } from '@/app/router'
+import toast from 'react-hot-toast'
 
 // Create a client for TanStack Query
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error: any) => {
+      if (error?.response?.status !== 404) {
+        const errorMessage =
+          error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          error.message ||
+          'Failed to load query data'
+        toast.error(errorMessage)
+      }
+    },
+  }),
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,

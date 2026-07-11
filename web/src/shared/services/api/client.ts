@@ -1,9 +1,21 @@
-import axios, { AxiosError } from 'axios'
-import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
+import axios from 'axios'
+import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios'
 import toast from 'react-hot-toast'
 
-// Retrieve API Base URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+// Retrieve API Base URL from environment variables, restricting localhost to development
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL
+  if (envUrl) return envUrl
+
+  const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development'
+  if (isDev) {
+    return 'http://localhost:5000/api'
+  }
+
+  throw new Error('VITE_API_BASE_URL environment variable is missing in production environment.')
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -47,31 +59,34 @@ apiClient.interceptors.response.use(
     const errorMessage =
       data?.detail || data?.message || error.message || 'An unexpected error occurred'
 
-    // Handle global HTTP status codes
-    switch (status) {
-      case 400:
-        toast.error(`Bad Request: ${errorMessage}`)
-        break
-      case 401:
-        toast.error('Unauthorized. Please log in again.')
-        // Redirect to login or clear credentials in the future
-        break
-      case 403:
-        toast.error('Forbidden: You do not have permissions for this action.')
-        break
-      case 404:
-        // Do not toast for 404s if handled inline by pages
-        break
-      case 500:
-        toast.error(`Server Error: ${errorMessage}`)
-        break
-      case 503:
-        toast.error('Service Unavailable. Please try again later.')
-        break
-      default:
-        toast.error(errorMessage)
+    // Handle global HTTP status codes (suppressed for GET requests to let TanStack QueryCache handle final failures)
+    const isGet = error.config?.method?.toLowerCase() === 'get'
+    if (!isGet) {
+      switch (status) {
+        case 400:
+          toast.error(`Bad Request: ${errorMessage}`)
+          break
+        case 401:
+          toast.error('Unauthorized. Please log in again.')
+          break
+        case 403:
+          toast.error('Forbidden: You do not have permissions for this action.')
+          break
+        case 404:
+          // Do not toast for 404s if handled inline by pages
+          break
+        case 500:
+          toast.error(`Server Error: ${errorMessage}`)
+          break
+        case 503:
+          toast.error('Service Unavailable. Please try again later.')
+          break
+        default:
+          toast.error(errorMessage)
+      }
     }
 
     return Promise.reject(error)
   },
 )
+export default apiClient

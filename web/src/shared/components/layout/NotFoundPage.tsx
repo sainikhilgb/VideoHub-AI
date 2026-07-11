@@ -19,7 +19,7 @@ export const NotFoundPage: React.FC = () => {
 
       <Link
         to="/"
-        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-custom-md hover:bg-accent-hover transition-colors focus:outline-none"
+        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-custom-md hover:bg-accent-hover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Dashboard

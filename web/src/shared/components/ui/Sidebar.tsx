@@ -37,7 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false }) => {
         {isMobileDrawer && (
           <button
             onClick={() => setSidebarOpen(false)}
-            className="text-slate-400 hover:text-white p-1 rounded-md focus:outline-none"
+            className="text-slate-400 hover:text-white p-1 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Close menu"
           >
             <X className="h-5 w-5" />
@@ -64,7 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false }) => {
         <div className="p-3 border-t border-slate-800 flex justify-end">
           <button
             onClick={toggleSidebarCollapse}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors focus:outline-none"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {sidebarCollapsed ? (

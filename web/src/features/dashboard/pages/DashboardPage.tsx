@@ -1,26 +1,17 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  Plus,
-  FolderClosed,
-  Video,
-  FileText,
-  Subtitles,
-  Cpu,
-  HardDrive,
-  ExternalLink,
-  ChevronRight,
-} from 'lucide-react'
+import { Plus, FolderClosed, FileText, Cpu, ExternalLink, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/shared/components/ui/PageHeader'
 import { DashboardCard } from '@/shared/components/ui/DashboardCard'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
 import { StatusBadge } from '@/shared/components/ui/StatusBadge'
 import { LoadingSpinner } from '@/shared/components/ui/LoadingSpinner'
 import { useProjects } from '@/shared/services/api/projects'
+import { ErrorState } from '@/shared/components/ui/ErrorState'
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate()
-  const { data: projects, isLoading, isError } = useProjects()
+  const { data: projects, isLoading, isError, refetch } = useProjects()
 
   if (isLoading) {
     return <LoadingSpinner size="lg" className="min-h-[50vh]" />
@@ -28,6 +19,9 @@ export const DashboardPage: React.FC = () => {
 
   // Get recent 4 projects to display
   const recentProjects = projects ? projects.slice(0, 4) : []
+  const processingProjects = projects
+    ? projects.filter((p) => p.status === 'processing' || p.status === 'pending')
+    : []
 
   // Stats Card data
   const stats = [
@@ -38,36 +32,16 @@ export const DashboardPage: React.FC = () => {
       trend: { value: 'Live count', positive: true },
     },
     {
-      title: 'Media Files',
-      value: projects ? projects.length : 0,
-      icon: Video,
-      trend: { value: 'Cataloged', positive: true },
-    },
-    {
       title: 'Transcriptions',
       value: projects ? projects.filter((p) => p.status === 'completed').length : 0,
       icon: FileText,
       trend: { value: 'ASR Whispers', positive: true },
     },
     {
-      title: 'Captions Generated',
-      value: projects ? projects.filter((p) => p.status === 'completed').length * 3 : 0,
-      icon: Subtitles,
-      trend: { value: 'SRT/VTT formats', positive: true },
-    },
-    {
       title: 'Processing Jobs',
-      value: projects
-        ? projects.filter((p) => p.status === 'processing' || p.status === 'pending').length
-        : 0,
+      value: processingProjects.length,
       icon: Cpu,
       description: 'Running on Hangfire',
-    },
-    {
-      title: 'Storage Used',
-      value: projects && projects.length > 0 ? `${(projects.length * 24.5).toFixed(1)} MB` : '0 MB',
-      icon: HardDrive,
-      description: 'Of 10 GB quota',
     },
   ]
 
@@ -86,7 +60,7 @@ export const DashboardPage: React.FC = () => {
         description="Here is the overview of your VideoHub AI workspace processing activities."
         actions={
           <Link
-            to="/projects/new"
+            to="/projects"
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-custom-sm hover:bg-accent-hover transition-colors duration-150"
           >
             <Plus className="h-4 w-4" />
@@ -127,7 +101,11 @@ export const DashboardPage: React.FC = () => {
             }
             padding={false}
           >
-            {isError || recentProjects.length === 0 ? (
+            {isError ? (
+              <div className="p-8">
+                <ErrorState onRetry={() => refetch()} />
+              </div>
+            ) : recentProjects.length === 0 ? (
               <div className="p-8 text-center text-text-muted text-xs">
                 No projects found. Create a project to see details here.
               </div>
@@ -179,25 +157,23 @@ export const DashboardPage: React.FC = () => {
           {/* Active Processing Queue */}
           <SectionCard title="Processing Queue" subtitle="Background jobs executing now.">
             <div className="space-y-3.5">
-              {projects && projects.some((p) => p.status === 'processing') ? (
-                projects
-                  .filter((p) => p.status === 'processing')
-                  .map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between p-3 rounded-lg border border-border-custom/60 bg-slate-50/50"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-text-main truncate m-0">
-                          Transcribing: {p.name}
-                        </p>
-                        <p className="text-[10px] text-text-muted mt-0.5 m-0">
-                          Project ID: {p.id.slice(0, 8)}
-                        </p>
-                      </div>
-                      <StatusBadge status="processing" label="Running" />
+              {processingProjects.length > 0 ? (
+                processingProjects.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between p-3 rounded-lg border border-border-custom/60 bg-slate-50/50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-text-main truncate m-0">
+                        Transcribing: {p.name}
+                      </p>
+                      <p className="text-[10px] text-text-muted mt-0.5 m-0">
+                        Project ID: {p.id.slice(0, 8)}
+                      </p>
                     </div>
-                  ))
+                    <StatusBadge status={p.status} />
+                  </div>
+                ))
               ) : (
                 <div className="text-center text-xs text-text-muted py-4">
                   No active processing jobs.
@@ -207,7 +183,7 @@ export const DashboardPage: React.FC = () => {
           </SectionCard>
 
           {/* Recent Activity Log panel */}
-          <SectionCard title="Recent Activity">
+          <SectionCard title="Recent Activity (Preview)">
             <div className="relative border-l border-border-custom ml-1.5 pl-4 space-y-4">
               {recentActivities.map((act) => (
                 <div key={act.id} className="relative">

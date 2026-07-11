@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useOutletContext } from 'react-router-dom'
 import { Upload, Trash2, Video, Loader2 } from 'lucide-react'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
@@ -17,6 +18,7 @@ import toast from 'react-hot-toast'
 export const ProjectMediaTab: React.FC = () => {
   const project = useOutletContext<Project>()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const queryClient = useQueryClient()
 
   // API Hooks
   const { data: mediaFiles, refetch } = useProjectMedia(project.id)
@@ -26,6 +28,7 @@ export const ProjectMediaTab: React.FC = () => {
 
   // Component states
   const [file, setFile] = useState<File | null>(null)
+  const [uploadedMediaId, setUploadedMediaId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [statusMessage, setStatusMessage] = useState('')
@@ -34,6 +37,7 @@ export const ProjectMediaTab: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0])
+      setUploadedMediaId(null)
     }
   }
 
@@ -45,6 +49,7 @@ export const ProjectMediaTab: React.FC = () => {
     e.preventDefault()
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setFile(e.dataTransfer.files[0])
+      setUploadedMediaId(null)
     }
   }
 
@@ -55,33 +60,45 @@ export const ProjectMediaTab: React.FC = () => {
   const handleStartProcessing = async () => {
     if (!file || !project.id) return
 
+    let activeMediaId = uploadedMediaId
+
     try {
       setIsProcessing(true)
-      setStatusMessage('Uploading media file to server...')
-      setUploadProgress(30)
 
-      // Step 1: Upload media file
-      const uploadRes = await uploadMediaMutation.mutateAsync({
-        projectId: project.id,
-        file,
-      })
+      if (!activeMediaId) {
+        setStatusMessage('Uploading media file to server...')
+        setUploadProgress(30)
+
+        // Step 1: Upload media file
+        const uploadRes = await uploadMediaMutation.mutateAsync({
+          projectId: project.id,
+          file,
+        })
+        activeMediaId = uploadRes.mediaId
+        setUploadedMediaId(activeMediaId)
+      }
 
       // Step 2: Trigger ASR queue
       setStatusMessage('Queueing AI transcription...')
       setUploadProgress(75)
       await generateCaptionsMutation.mutateAsync({
         projectId: project.id,
-        mediaId: uploadRes.mediaId,
+        mediaId: activeMediaId,
         targetLanguages: [project.originalLanguage],
       })
 
       setUploadProgress(100)
       toast.success('Media file uploaded successfully! Processing started.')
       refetch()
+      queryClient.invalidateQueries({ queryKey: ['project', project.id] })
+
+      // Clear tracked states only after successful caption generation
       setFile(null)
+      setUploadedMediaId(null)
       setIsProcessing(false)
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to process media file')
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to process media file'
+      toast.error(errorMessage)
       setIsProcessing(false)
     }
   }

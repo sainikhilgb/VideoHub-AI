@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
 import { apiClient } from './client'
 
 // Interfaces matching .NET DTO models
@@ -124,11 +125,6 @@ export const useUploadMedia = () => {
       const response = await apiClient.post<UploadMediaResponse>(
         `/v1/projects/${projectId}/media`,
         formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        },
       )
       return response.data
     },
@@ -185,7 +181,7 @@ export interface MediaFile {
   createdAt: string
 }
 
-// 8. Fetch project media files (mocked fallback if backend 404s/fails)
+// 8. Fetch project media files (mocked fallback only if backend 404s)
 export const useProjectMedia = (projectId: string | undefined) => {
   return useQuery<MediaFile[]>({
     queryKey: ['projectMedia', projectId],
@@ -194,19 +190,22 @@ export const useProjectMedia = (projectId: string | undefined) => {
       try {
         const response = await apiClient.get<MediaFile[]>(`/v1/projects/${projectId}/media`)
         return response.data
-      } catch {
-        // Fallback mock since backend is infrastructure-first and lacks media list GET
-        return [
-          {
-            id: 'media-1111',
-            projectId: projectId || '',
-            fileName: 'interview_raw.mp4',
-            contentType: 'video/mp4',
-            fileSize: 48200000,
-            status: 'processed',
-            createdAt: new Date().toISOString(),
-          },
-        ]
+      } catch (err: unknown) {
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          // Fallback mock since backend is infrastructure-first and lacks media list GET
+          return [
+            {
+              id: 'media-1111',
+              projectId: projectId || '',
+              fileName: 'interview_raw.mp4',
+              contentType: 'video/mp4',
+              fileSize: 48200000,
+              status: 'processed',
+              createdAt: new Date().toISOString(),
+            },
+          ]
+        }
+        throw err
       }
     },
     enabled: !!projectId,
@@ -220,12 +219,41 @@ export const useDeleteMedia = (projectId: string | undefined) => {
     mutationFn: async (mediaId) => {
       try {
         await apiClient.delete(`/v1/media/${mediaId}`)
-      } catch {
-        // Mock success if endpoint doesn't exist yet
+      } catch (err: unknown) {
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          return
+        }
+        throw err
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projectMedia', projectId] })
+    },
+  })
+}
+
+// 10. Update project settings
+export interface UpdateProjectParams {
+  projectId: string
+  name: string
+  originalLanguage: string
+  userId: string
+}
+
+export const useUpdateProject = () => {
+  const queryClient = useQueryClient()
+  return useMutation<Project, Error, UpdateProjectParams>({
+    mutationFn: async ({ projectId, name, originalLanguage, userId }) => {
+      const response = await apiClient.put<Project>(`/v1/projects/${projectId}`, {
+        name,
+        originalLanguage,
+        userId,
+      })
+      return response.data
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] })
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
   })
 }

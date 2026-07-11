@@ -9,35 +9,28 @@ import {
   Calendar,
   Layers,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
 import { StatusBadge } from '@/shared/components/ui/StatusBadge'
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
-import { useDeleteProject, type Project } from '@/shared/services/api/projects'
-import toast from 'react-hot-toast'
+import { LoadingSpinner } from '@/shared/components/ui/LoadingSpinner'
+import { useDeleteProjectFlow } from '../hooks/useDeleteProjectFlow'
+import type { Project } from '@/shared/services/api/projects'
 
 export const ProjectOverviewTab: React.FC = () => {
   const project = useOutletContext<Project>()
   const navigate = useNavigate()
-  const deleteProjectMutation = useDeleteProject()
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
 
-  const handleDeleteProject = async () => {
-    toast.promise(deleteProjectMutation.mutateAsync(project.id), {
-      loading: 'Deleting project...',
-      success: () => {
-        navigate('/projects')
-        return 'Project deleted successfully'
-      },
-      error: 'Failed to delete project',
-    })
-    setDeleteConfirmOpen(false)
-  }
+  const { deleteConfirmOpen, setDeleteConfirmOpen, handleDeleteProject } = useDeleteProjectFlow(
+    project.id,
+  )
 
   const isCreated = project.status.toLowerCase() === 'created'
   const isProcessing =
     project.status.toLowerCase() === 'processing' || project.status.toLowerCase() === 'pending'
   const isCompleted = project.status.toLowerCase() === 'completed'
+  const isFailed = project.status.toLowerCase() === 'failed'
 
   return (
     <div className="grid gap-6 md:grid-cols-3">
@@ -91,7 +84,7 @@ export const ProjectOverviewTab: React.FC = () => {
 
         {isProcessing && (
           <div className="flex flex-col items-center justify-center text-center p-8 rounded-xl border border-border-custom bg-card select-none">
-            <Loader className="h-10 w-10 text-accent animate-spin mb-4" />
+            <LoadingSpinner size="md" className="mb-4 text-accent" />
             <h3 className="text-sm font-semibold text-text-main m-0">
               AI Speech-to-Text Processing
             </h3>
@@ -116,6 +109,34 @@ export const ProjectOverviewTab: React.FC = () => {
               </div>
             </div>
           </SectionCard>
+        )}
+
+        {isFailed && (
+          <div className="flex flex-col items-center justify-center text-center p-8 rounded-xl border border-red-100 bg-red-50/20 select-none">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 border border-red-200 text-danger mb-4">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <h3 className="text-sm font-semibold text-danger m-0">Processing Failed</h3>
+            <p className="text-xs text-text-muted mt-1.5 mb-4 max-w-sm">
+              The speech-to-text processing job failed for this project. Check the Jobs tab for
+              technical logs.
+            </p>
+            <Link
+              to={`/projects/${project.id}/jobs`}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-danger px-4 py-2 text-xs font-semibold text-white shadow-custom-sm hover:bg-red-700 transition-colors"
+            >
+              Go to Jobs Tab
+            </Link>
+          </div>
+        )}
+
+        {!isCreated && !isProcessing && !isCompleted && !isFailed && (
+          <div className="flex flex-col items-center justify-center text-center p-8 rounded-xl border border-border-custom bg-card select-none">
+            <h3 className="text-sm font-semibold text-text-main m-0">Unknown Status</h3>
+            <p className="text-xs text-text-muted mt-1.5">
+              The project is in an unrecognized state: {project.status}.
+            </p>
+          </div>
         )}
       </div>
 
@@ -183,15 +204,4 @@ export const ProjectOverviewTab: React.FC = () => {
     </div>
   )
 }
-
-// Simple loader helper inside file
-const Loader: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path
-      className="opacity-75"
-      fill="currentColor"
-      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-    />
-  </svg>
-)
+export default ProjectOverviewTab

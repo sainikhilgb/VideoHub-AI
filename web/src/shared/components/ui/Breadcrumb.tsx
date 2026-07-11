@@ -10,6 +10,7 @@ export const Breadcrumb: React.FC = () => {
     <nav className="flex items-center space-x-1.5 text-xs text-text-muted" aria-label="Breadcrumb">
       <Link
         to="/"
+        aria-label="Home"
         className="flex items-center hover:text-text-main transition-colors duration-150"
       >
         <Home className="h-3.5 w-3.5" />
@@ -24,7 +25,9 @@ export const Breadcrumb: React.FC = () => {
           <React.Fragment key={to}>
             <ChevronRight className="h-3.5 w-3.5 text-text-muted/60" />
             {isLast ? (
-              <span className="font-medium text-text-main select-none">{formattedName}</span>
+              <span aria-current="page" className="font-medium text-text-main select-none">
+                {formattedName}
+              </span>
             ) : (
               <Link to={to} className="hover:text-text-main transition-colors duration-150">
                 {formattedName}

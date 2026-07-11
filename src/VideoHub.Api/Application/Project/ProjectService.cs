@@ -26,16 +26,7 @@ public sealed class ProjectService : IProjectService
         User? user = await _userRepository.GetByIdAsync(project.UserId, cancellationToken);
         if (user is null)
         {
-            _logger.LogInformation("User not found, auto-creating User: UserId={UserId}", project.UserId);
-            user = new User
-            {
-                Id = project.UserId,
-                Email = $"user_{project.UserId:N}@example.com",
-                Role = "User",
-                DisplayName = "Auto-Created User",
-                CreatedAt = DateTimeOffset.UtcNow
-            };
-            await _userRepository.AddAsync(user, cancellationToken);
+            throw new NotFoundException($"User '{project.UserId}' was not found.");
         }
 
         var newProject = await _projectRepository.CreateAsync(new Project

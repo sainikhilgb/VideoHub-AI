@@ -22,7 +22,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       {onRetry && (
         <button
           onClick={onRetry}
-          className="rounded-lg bg-danger px-4 py-2 text-xs font-semibold text-white shadow-custom-sm hover:bg-red-700 transition-colors focus:outline-none"
+          className="rounded-lg bg-danger px-4 py-2 text-xs font-semibold text-white shadow-custom-sm hover:bg-red-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-danger"
         >
           Retry
         </button>

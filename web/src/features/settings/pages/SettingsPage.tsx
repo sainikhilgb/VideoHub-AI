@@ -2,6 +2,7 @@ import React from 'react'
 import { PageHeader } from '@/shared/components/ui/PageHeader'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
 import { Save } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export const SettingsPage: React.FC = () => {
   return (
@@ -16,30 +17,41 @@ export const SettingsPage: React.FC = () => {
           <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-text-main mb-1.5">
+                <label
+                  htmlFor="firstName"
+                  className="block text-sm font-medium text-text-main mb-1.5"
+                >
                   First Name
                 </label>
                 <input
                   type="text"
+                  id="firstName"
                   defaultValue="John"
                   className="w-full rounded-lg border border-border-custom bg-card px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-text-main mb-1.5">Last Name</label>
+                <label
+                  htmlFor="lastName"
+                  className="block text-sm font-medium text-text-main mb-1.5"
+                >
+                  Last Name
+                </label>
                 <input
                   type="text"
+                  id="lastName"
                   defaultValue="Doe"
                   className="w-full rounded-lg border border-border-custom bg-card px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-main mb-1.5">
+              <label htmlFor="email" className="block text-sm font-medium text-text-main mb-1.5">
                 Email Address
               </label>
               <input
                 type="email"
+                id="email"
                 defaultValue="john.doe@videohub.ai"
                 className="w-full rounded-lg border border-border-custom bg-card px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
@@ -50,10 +62,16 @@ export const SettingsPage: React.FC = () => {
         <SectionCard title="AI Processing Engine" subtitle="Adjust default AI configurations.">
           <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
             <div>
-              <label className="block text-sm font-medium text-text-main mb-1.5">
+              <label
+                htmlFor="asrEngine"
+                className="block text-sm font-medium text-text-main mb-1.5"
+              >
                 Default ASR Engine
               </label>
-              <select className="w-full rounded-lg border border-border-custom bg-card px-3 py-2 text-sm focus:border-accent focus:ring-1 focus:ring-accent">
+              <select
+                id="asrEngine"
+                className="w-full rounded-lg border border-border-custom bg-card px-3 py-2 text-sm focus:border-accent focus:ring-1 focus:ring-accent"
+              >
                 <option value="whisper-v3">OpenAI Whisper Large v3 (High Quality)</option>
                 <option value="whisper-distil">Distil-Whisper (Faster)</option>
                 <option value="assembly">AssemblyAI (Enterprise)</option>
@@ -77,7 +95,10 @@ export const SettingsPage: React.FC = () => {
         </SectionCard>
 
         <div className="flex justify-end gap-3">
-          <button className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white shadow-custom-sm hover:bg-accent-hover transition-colors">
+          <button
+            onClick={() => toast.success('Settings saved successfully!')}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white shadow-custom-sm hover:bg-accent-hover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent"
+          >
             <Save className="h-4 w-4" />
             Save Changes
           </button>
@@ -86,3 +107,4 @@ export const SettingsPage: React.FC = () => {
     </div>
   )
 }
+export default SettingsPage

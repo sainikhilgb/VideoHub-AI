@@ -1,57 +1,40 @@
 import React, { useState } from 'react'
-import { useOutletContext, useNavigate } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
 import { Save, Trash2 } from 'lucide-react'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
-import { useDeleteProject, type Project } from '@/shared/services/api/projects'
-import { apiClient } from '@/shared/services/api/client'
-import { useQueryClient } from '@tanstack/react-query'
+import { useUpdateProject, type Project } from '@/shared/services/api/projects'
+import { useDeleteProjectFlow } from '../hooks/useDeleteProjectFlow'
 import toast from 'react-hot-toast'
 
 export const ProjectSettingsTab: React.FC = () => {
   const project = useOutletContext<Project>()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const deleteProjectMutation = useDeleteProject()
+  const updateProjectMutation = useUpdateProject()
 
   const [name, setName] = useState(project.name)
   const [language, setLanguage] = useState(project.originalLanguage)
-  const [isSaving, setIsSaving] = useState(false)
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+
+  const { deleteConfirmOpen, setDeleteConfirmOpen, handleDeleteProject } = useDeleteProjectFlow(
+    project.id,
+  )
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name) return
 
-    try {
-      setIsSaving(true)
-      // Call PUT /projects/{projectId}
-      await apiClient.put(`/v1/projects/${project.id}`, {
+    toast.promise(
+      updateProjectMutation.mutateAsync({
+        projectId: project.id,
         name,
         originalLanguage: language,
         userId: project.userId,
-      })
-
-      toast.success('Project settings updated!')
-      queryClient.invalidateQueries({ queryKey: ['project', project.id] })
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-    } catch {
-      toast.error('Failed to update project settings')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleDeleteProject = async () => {
-    toast.promise(deleteProjectMutation.mutateAsync(project.id), {
-      loading: 'Deleting project...',
-      success: () => {
-        navigate('/projects')
-        return 'Project deleted successfully'
+      }),
+      {
+        loading: 'Updating project settings...',
+        success: 'Project settings updated!',
+        error: 'Failed to update project settings',
       },
-      error: 'Failed to delete project',
-    })
-    setDeleteConfirmOpen(false)
+    )
   }
 
   return (
@@ -98,7 +81,7 @@ export const ProjectSettingsTab: React.FC = () => {
           <div className="flex justify-end pt-3 border-t border-border-custom/50">
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={updateProjectMutation.isPending}
               className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white shadow-custom-sm hover:bg-accent-hover transition-colors"
             >
               <Save className="h-4 w-4" />

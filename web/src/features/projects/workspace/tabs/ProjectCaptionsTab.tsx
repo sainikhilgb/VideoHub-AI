@@ -12,7 +12,25 @@ export const ProjectCaptionsTab: React.FC = () => {
   const isCompleted = project.status.toLowerCase() === 'completed'
 
   const handleDownload = (format: string) => {
-    toast.success(`Downloading subtitle captions in .${format.toLowerCase()} format...`)
+    const mockSrt = `1\n00:00:00,000 --> 00:00:08,000\nWelcome to VideoHub AI. In this tutorial, we will learn how to initialize the platform.\n\n2\n00:00:08,000 --> 00:00:15,000\nOur core stack consists of React 19, TailwindCSS v4, and React Router v7.`
+    const mockVtt = `WEBVTT\n\n1\n00:00:00.000 --> 00:00:08.000\nWelcome to VideoHub AI. In this tutorial, we will learn how to initialize the platform.\n\n2\n00:00:08.000 --> 00:00:15.000\nOur core stack consists of React 19, TailwindCSS v4, and React Router v7.`
+    const mockAss = `[Script Info]\nTitle: VideoHub AI Captions\n\n[Events]\nDialogue: 0,0:00:00.00,0:00:08.00,Default,,0,0,0,,Welcome to VideoHub AI.\nDialogue: 0,0:00:08.00,0:00:15.00,Default,,0,0,0,,Our core stack consists of React 19...`
+
+    let content = mockSrt
+    if (format.toLowerCase() === 'vtt') content = mockVtt
+    if (format.toLowerCase() === 'ass') content = mockAss
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${project.name.replace(/\s+/g, '_')}_subtitles.${format.toLowerCase()}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    toast.success(`Subtitle captions downloaded in .${format.toLowerCase()} format!`)
   }
 
   return (

@@ -14,8 +14,9 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ size = 'md', cla
   }
 
   return (
-    <div className={`flex items-center justify-center p-4 ${className}`}>
+    <div role="status" className={`flex items-center justify-center p-4 ${className}`}>
       <Loader2 className={`animate-spin text-accent ${sizeClasses[size]}`} />
+      <span className="sr-only">Loading...</span>
     </div>
   )
 }

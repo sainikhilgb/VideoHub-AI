@@ -25,7 +25,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
         className,
       )}
     >
-      {(title || actions) && (
+      {(title || subtitle || actions) && (
         <div className="flex items-center justify-between border-b border-border-custom/50 px-5 py-4 bg-slate-50/50">
           <div>
             {title && <h3 className="text-sm font-semibold text-text-main m-0">{title}</h3>}

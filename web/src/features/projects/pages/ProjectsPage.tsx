@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, FolderClosed, Trash2, ExternalLink, X } from 'lucide-react'
 import { PageHeader } from '@/shared/components/ui/PageHeader'
@@ -23,6 +23,59 @@ export const ProjectsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [name, setName] = useState('')
   const [language, setLanguage] = useState('en')
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  // Focus trapping and Escape key listener
+  useEffect(() => {
+    if (!isModalOpen) return
+
+    const previousActiveElement = document.activeElement as HTMLElement
+    const modalElement = modalRef.current
+    if (modalElement) {
+      const inputElement = modalElement.querySelector('#projectName') as HTMLInputElement
+      if (inputElement) {
+        inputElement.focus()
+      }
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsModalOpen(false)
+      }
+
+      if (e.key === 'Tab' && modalElement) {
+        const focusableSelectors =
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        const focusableElements = Array.from(
+          modalElement.querySelectorAll<HTMLElement>(focusableSelectors),
+        )
+        if (focusableElements.length === 0) return
+
+        const firstElement = focusableElements[0]
+        const lastElement = focusableElements[focusableElements.length - 1]
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            lastElement.focus()
+            e.preventDefault()
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            firstElement.focus()
+            e.preventDefault()
+          }
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      if (previousActiveElement) {
+        previousActiveElement.focus()
+      }
+    }
+  }, [isModalOpen])
 
   const handleDeleteConfirm = async () => {
     if (!projectToDelete) return
@@ -171,10 +224,15 @@ export const ProjectsPage: React.FC = () => {
         onCancel={() => setProjectToDelete(null)}
       />
 
-      {/* Create Project Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
-          <div className="relative w-full max-w-md rounded-xl border border-border-custom bg-card shadow-custom-lg p-6 animate-scale-up">
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+            className="relative w-full max-w-md rounded-xl border border-border-custom bg-card shadow-custom-lg p-6 animate-scale-up"
+          >
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 text-text-muted hover:text-text-main p-1 rounded-md transition-colors focus:outline-none"
@@ -182,7 +240,9 @@ export const ProjectsPage: React.FC = () => {
               <X className="h-4 w-4" />
             </button>
 
-            <h3 className="text-base font-semibold text-text-main mb-1">Create New Project</h3>
+            <h3 id="modal-title" className="text-base font-semibold text-text-main mb-1">
+              Create New Project
+            </h3>
             <p className="text-xs text-text-muted mb-5">
               Provide a name and source spoken language.
             </p>

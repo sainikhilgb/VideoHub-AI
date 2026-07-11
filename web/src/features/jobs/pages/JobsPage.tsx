@@ -3,6 +3,7 @@ import { PageHeader } from '@/shared/components/ui/PageHeader'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
 import { StatusBadge } from '@/shared/components/ui/StatusBadge'
 import { Cpu, RefreshCw } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export const JobsPage: React.FC = () => {
   const mockJobs = [
@@ -16,7 +17,7 @@ export const JobsPage: React.FC = () => {
     },
     {
       id: 'job-102',
-      name: 'Audio Extraction',
+      name: 'Audio Track Extraction',
       type: 'extraction',
       status: 'completed',
       duration: '22s',
@@ -38,9 +39,12 @@ export const JobsPage: React.FC = () => {
         title="Jobs Queue"
         description="Monitor active and historical background AI processing tasks."
         actions={
-          <button className="inline-flex items-center gap-1.5 rounded-lg border border-border-custom bg-card px-4 py-2 text-sm font-semibold text-text-main shadow-custom-sm hover:bg-slate-50 transition-colors">
+          <button
+            onClick={() => toast.success('Refreshing background jobs queue...')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border-custom bg-card px-4 py-2 text-sm font-semibold text-text-main shadow-custom-sm hover:bg-slate-50 transition-colors"
+          >
             <RefreshCw className="h-4 w-4 text-text-muted" />
-            Refresh Queue
+            Refresh Queue (Preview)
           </button>
         }
       />

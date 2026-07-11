@@ -287,7 +287,7 @@ Located in the `web` directory, this is the modern responsive frontend applicati
    npm install
    ```
 3. **Configure environment**:
-   Create a `.env` file inside the `web` directory (already pre-configured with default values):
+   Manually create a `.env` file inside the `web` directory with the required `VITE_API_BASE_URL` value (not tracked by Git, per `web/.gitignore`):
    ```bash
    VITE_API_BASE_URL=http://localhost:5000/api
    ```
@@ -295,7 +295,7 @@ Located in the `web` directory, this is the modern responsive frontend applicati
    ```bash
    npm run dev
    ```
-5. **Run tests/checks**:
+5. **Run checks**:
    ```bash
    npm run build  # Compiles TypeScript and builds production artifacts
    npm run lint   # Runs ESLint rules checking
