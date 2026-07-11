@@ -15,6 +15,29 @@ builder.Configuration.AddEnvironmentVariables();
 builder.AddStructuredLogging();
 
 builder.Services.AddControllers();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
+        else
+        {
+            var allowedOrigins = builder.Configuration.GetValue<string>("Cors:AllowedOrigins")
+                ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                ?? new[] { "http://localhost:5173" };
+
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
+    });
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails(options =>
@@ -37,6 +60,7 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseCors("CorsPolicy");
 app.UseInfrastructure();
 
 app.MapGet("/", () => Results.Redirect("/swagger"));
@@ -52,5 +76,23 @@ app.Lifetime.ApplicationStopped.Register(() =>
 {
     app.Logger.LogWarning("Application stopped.");
 });
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<VideoHub.Api.Infrastructure.Persistence.AppDbContext>();
+    var defaultUserId = Guid.Parse("00000000-0000-0000-0000-000000000000");
+    if (!dbContext.Users.Any(u => u.Id == defaultUserId))
+    {
+        dbContext.Users.Add(new VideoHub.Api.Domain.Entities.User
+        {
+            Id = defaultUserId,
+            Email = "system_default@example.com",
+            Role = "User",
+            DisplayName = "Default Local User",
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        dbContext.SaveChanges();
+    }
+}
 
 app.Run();
