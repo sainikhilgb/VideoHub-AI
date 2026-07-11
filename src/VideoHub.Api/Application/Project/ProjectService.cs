@@ -23,11 +23,11 @@ public sealed class ProjectService : IProjectService
     {
         _logger.LogInformation("Project Creation Started: Name={Name} UserId={UserId}", project.Name, project.UserId);
 
-        var userExists = await _userRepository.GetByIdAsync(project.UserId, cancellationToken) is not null;
-        if (!userExists)
+        User? user = await _userRepository.GetByIdAsync(project.UserId, cancellationToken);
+        if (user is null)
         {
             _logger.LogInformation("User not found, auto-creating User: UserId={UserId}", project.UserId);
-            var newUser = new User
+            user = new User
             {
                 Id = project.UserId,
                 Email = $"user_{project.UserId:N}@example.com",
@@ -35,7 +35,7 @@ public sealed class ProjectService : IProjectService
                 DisplayName = "Auto-Created User",
                 CreatedAt = DateTimeOffset.UtcNow
             };
-            await _userRepository.AddAsync(newUser, cancellationToken);
+            await _userRepository.AddAsync(user, cancellationToken);
         }
 
         var newProject = await _projectRepository.CreateAsync(new Project
@@ -43,6 +43,7 @@ public sealed class ProjectService : IProjectService
             Name = project.Name,
             OriginalLanguage = project.OriginalLanguage,
             UserId = project.UserId,
+            User = user,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         }, cancellationToken);

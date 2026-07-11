@@ -272,6 +272,36 @@ Located in the `ai` directory, this stateless AI worker handles transcription an
    ./.venv/bin/uvicorn main:app --reload --port 8000
    ```
 
+## Frontend Web UI (React / Vite)
+
+Located in the `web` directory, this is the modern responsive frontend application for managing speech-to-text, projects, and subtitles.
+
+### Setup and Running the Frontend
+
+1. **Navigate to the web folder**:
+   ```bash
+   cd web
+   ```
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Configure environment**:
+   Create a `.env` file inside the `web` directory (already pre-configured with default values):
+   ```bash
+   VITE_API_BASE_URL=http://localhost:5000/api
+   ```
+4. **Run the development server**:
+   ```bash
+   npm run dev
+   ```
+5. **Run tests/checks**:
+   ```bash
+   npm run build  # Compiles TypeScript and builds production artifacts
+   npm run lint   # Runs ESLint rules checking
+   npm run format # Formats codebase using Prettier
+   ```
+
 ## Running Locally
 
 ### Prerequisites

@@ -15,4 +15,6 @@ public interface IBackgroundJobService
     Task ExecuteHelloWorldAsync(string jobType, CancellationToken cancellationToken = default);
 
     Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, string? correlationId = null, CancellationToken cancellationToken = default);
+
+    Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, CancellationToken cancellationToken);
 }

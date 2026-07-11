@@ -15,6 +15,15 @@ builder.Configuration.AddEnvironmentVariables();
 builder.AddStructuredLogging();
 
 builder.Services.AddControllers();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails(options =>
@@ -37,6 +46,7 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseCors("CorsPolicy");
 app.UseInfrastructure();
 
 app.MapGet("/", () => Results.Redirect("/swagger"));

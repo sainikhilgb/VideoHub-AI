@@ -95,6 +95,11 @@ public sealed class BackgroundJobService : IBackgroundJobService
         }
     }
 
+    public Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, CancellationToken cancellationToken)
+    {
+        return ExecuteMediaProcessingAsync(jobId, mediaFileId, null, cancellationToken);
+    }
+
     public async Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, string? correlationId = null, CancellationToken cancellationToken = default)
     {
         using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
