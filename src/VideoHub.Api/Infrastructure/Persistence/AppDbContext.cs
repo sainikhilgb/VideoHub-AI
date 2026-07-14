@@ -22,6 +22,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<CaptionFile> CaptionFiles => Set<CaptionFile>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -153,6 +154,23 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(job => job.Project)
                 .WithMany(project => project.Jobs)
                 .HasForeignKey(job => job.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(u => u.Email)
+                .IsUnique();
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasIndex(rt => rt.Token)
+                .IsUnique();
+
+            entity.HasOne(rt => rt.User)
+                .WithMany()
+                .HasForeignKey(rt => rt.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

@@ -1,6 +1,7 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.Extensions.DependencyInjection;
+using VideoHub.Api.Application.Authentication;
 using VideoHub.Api.Application.BackgroundJobs;
 using VideoHub.Api.Application.Captions;
 using VideoHub.Api.Application.Uploads;
@@ -17,6 +18,7 @@ public static class ApplicationExtensions
         services.AddScoped<IMediaUploadService, MediaUploadService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<ICaptionService, CaptionService>();
+        services.AddScoped<IAuthenticationService, AuthenticationService>();
         return services;
     }
 }

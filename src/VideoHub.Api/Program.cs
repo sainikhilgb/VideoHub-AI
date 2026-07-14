@@ -39,7 +39,35 @@ builder.Services.AddCors(options =>
     });
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "VideoHub AI API", Version = "v1" });
+    
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
+    });
+
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
@@ -76,23 +104,5 @@ app.Lifetime.ApplicationStopped.Register(() =>
 {
     app.Logger.LogWarning("Application stopped.");
 });
-
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<VideoHub.Api.Infrastructure.Persistence.AppDbContext>();
-    var defaultUserId = Guid.Parse("00000000-0000-0000-0000-000000000000");
-    if (!dbContext.Users.Any(u => u.Id == defaultUserId))
-    {
-        dbContext.Users.Add(new VideoHub.Api.Domain.Entities.User
-        {
-            Id = defaultUserId,
-            Email = "system_default@example.com",
-            Role = "User",
-            DisplayName = "Default Local User",
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        dbContext.SaveChanges();
-    }
-}
 
 app.Run();
