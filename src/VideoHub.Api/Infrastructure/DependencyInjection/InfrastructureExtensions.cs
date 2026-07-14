@@ -44,7 +44,14 @@ public static class InfrastructureExtensions
         var jwtSettings = configuration.GetSection(JwtOptions.SectionName);
         services.Configure<JwtOptions>(jwtSettings);
 
-        var jwtOptions = jwtSettings.Get<JwtOptions>() ?? new JwtOptions();
+        var jwtOptions = jwtSettings.Get<JwtOptions>()
+            ?? throw new InvalidOperationException("Missing Jwt configuration section.");
+
+        if (string.IsNullOrEmpty(jwtOptions.Secret) || jwtOptions.Secret.Length < 16)
+        {
+            throw new InvalidOperationException("Jwt Secret must be configured and be at least 16 characters long.");
+        }
+
         var secretKey = Encoding.UTF8.GetBytes(jwtOptions.Secret);
 
         services.AddAuthentication(options =>

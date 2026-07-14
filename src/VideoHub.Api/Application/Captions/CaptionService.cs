@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using VideoHub.Api.Application.Exceptions;
 using VideoHub.Api.Domain.Entities;
@@ -19,6 +20,7 @@ public sealed class CaptionService : ICaptionService
     private readonly IUnitOfWork unitOfWork;
     private readonly IHttpClientFactory httpClientFactory;
     private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor;
+    private readonly IConfiguration configuration;
     private readonly ILogger<CaptionService> logger;
 
     public CaptionService(
@@ -31,6 +33,7 @@ public sealed class CaptionService : ICaptionService
         IUnitOfWork unitOfWork,
         IHttpClientFactory httpClientFactory,
         Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
+        IConfiguration configuration,
         ILogger<CaptionService> logger)
     {
         this.captionFileRepository = captionFileRepository;
@@ -42,6 +45,7 @@ public sealed class CaptionService : ICaptionService
         this.unitOfWork = unitOfWork;
         this.httpClientFactory = httpClientFactory;
         this.httpContextAccessor = httpContextAccessor;
+        this.configuration = configuration;
         this.logger = logger;
     }
 
@@ -121,6 +125,7 @@ public sealed class CaptionService : ICaptionService
             requestId = Guid.NewGuid().ToString();
         }
 
+        var callbackSecret = configuration["AiService:CallbackSecret"] ?? "VideoHubAI_Secure_Callback_Secret_2026";
         var request = new AiProcessRequest
         {
             JobId = jobId,
@@ -130,7 +135,7 @@ public sealed class CaptionService : ICaptionService
             Bucket = bucket,
             StoragePath = storagePath,
             OriginalLanguage = originalLanguage,
-            CallbackUrl = $"/api/v1/jobs/{jobId}/callback",
+            CallbackUrl = $"/api/v1/jobs/{jobId}/callback?secret={callbackSecret}",
             Languages = languageTargets,
             CorrelationId = correlationId,
             RequestId = requestId

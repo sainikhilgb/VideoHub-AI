@@ -27,7 +27,6 @@ export const ProjectSettingsTab: React.FC = () => {
         projectId: project.id,
         name,
         originalLanguage: language,
-        userId: project.userId,
       }),
       {
         loading: 'Updating project settings...',

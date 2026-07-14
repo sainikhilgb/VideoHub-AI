@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using VideoHub.Api.Application.Captions;
 using VideoHub.Api.Application.CurrentUser;
 using VideoHub.Api.Infrastructure.Abstractions;
@@ -17,6 +18,7 @@ public sealed class JobsController : ControllerBase
     private readonly IRepository<CaptionFile> captionFileRepository;
     private readonly IRepository<Project> projectRepository;
     private readonly ICurrentUserService currentUserService;
+    private readonly IConfiguration configuration;
     private readonly ILogger<JobsController> logger;
 
     public JobsController(
@@ -25,6 +27,7 @@ public sealed class JobsController : ControllerBase
         IRepository<CaptionFile> captionFileRepository,
         IRepository<Project> projectRepository,
         ICurrentUserService currentUserService,
+        IConfiguration configuration,
         ILogger<JobsController> logger)
     {
         this.captionService = captionService;
@@ -32,6 +35,7 @@ public sealed class JobsController : ControllerBase
         this.captionFileRepository = captionFileRepository;
         this.projectRepository = projectRepository;
         this.currentUserService = currentUserService;
+        this.configuration = configuration;
         this.logger = logger;
     }
 
@@ -46,8 +50,24 @@ public sealed class JobsController : ControllerBase
     public async Task<IActionResult> ProcessCallback(
         Guid jobId,
         [FromBody] AiProcessCallbackDto dto,
+        [FromQuery] string? secret,
         CancellationToken cancellationToken)
     {
+        var expectedSecret = configuration["AiService:CallbackSecret"] ?? "VideoHubAI_Secure_Callback_Secret_2026";
+        if (string.IsNullOrEmpty(secret))
+        {
+            if (Request.Headers.TryGetValue("X-Callback-Secret", out var headerSecret))
+            {
+                secret = headerSecret;
+            }
+        }
+
+        if (secret != expectedSecret)
+        {
+            logger.LogWarning("Unauthorized job callback attempt: JobId={JobId}", jobId);
+            return Unauthorized("Invalid callback credentials.");
+        }
+
         logger.LogInformation("Job Callback Received: JobId={JobId} DetectedLanguage={Lang}", jobId, dto.DetectedLanguage);
 
         await captionService.FinalizeJobAsync(jobId, dto.DetectedLanguage, dto.Segments, cancellationToken);

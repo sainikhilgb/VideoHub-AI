@@ -19,7 +19,13 @@ public sealed class CurrentUserService : ICurrentUserService
         {
             var userIdClaim = httpContextAccessor.HttpContext?.User?
                 .FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return Guid.TryParse(userIdClaim, out var userId) ? userId : Guid.Empty;
+            
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                throw new UnauthorizedAccessException("User ID claim is missing or invalid.");
+            }
+            
+            return userId;
         }
     }
 

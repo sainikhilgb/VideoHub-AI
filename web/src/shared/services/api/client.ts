@@ -85,8 +85,15 @@ apiClient.interceptors.response.use(
     const errorMessage =
       data?.detail || data?.message || error.message || 'An unexpected error occurred'
 
+    const isAuthRequest = originalRequest.url && (
+      originalRequest.url.endsWith('/v1/auth/login') ||
+      originalRequest.url.endsWith('/v1/auth/register') ||
+      originalRequest.url.endsWith('/v1/auth/refresh') ||
+      originalRequest.url.endsWith('/v1/auth/logout')
+    )
+
     // Handle JWT Token Expired / Refresh
-    if (status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/v1/auth/')) {
+    if (status === 401 && !originalRequest._retry && !isAuthRequest) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject })
@@ -108,13 +115,10 @@ apiClient.interceptors.response.use(
         isRefreshing = true
 
         try {
-          // Note: Call directly with vanilla axios instance to avoid looping on 401
-          const response = await axios.post(
-            `${API_BASE_URL}/v1/auth/refresh`,
-            {},
-            { withCredentials: true }
-          )
-          const { accessToken: newAccessToken } = response.data
+          // Dynamic import to avoid early circular evaluation
+          const { authApi } = await import('@/features/auth/services/authApi')
+          const response = await authApi.refresh()
+          const newAccessToken = response.accessToken
 
           setAccessToken(newAccessToken)
 

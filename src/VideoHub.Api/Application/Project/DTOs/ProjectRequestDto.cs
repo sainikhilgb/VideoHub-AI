@@ -9,7 +9,4 @@ public class ProjectRequestDto
     [Required]
     [MaxLength(20)]
     public string OriginalLanguage { get; set; } = string.Empty;
-
-    [Required]
-    public Guid UserId { get; set; }
 }

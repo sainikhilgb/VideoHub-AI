@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Text;
 using VideoHub.Api.Application.Authentication.DTOs;
 using VideoHub.Api.Application.Exceptions;
 using VideoHub.Api.Application.Users;
@@ -39,19 +41,20 @@ public sealed class AuthenticationService : IAuthenticationService
 
     public async Task<RegisterResponseDto> RegisterAsync(RegisterRequestDto request, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("Registration Started: Email={Email}", request.Email);
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        logger.LogInformation("Registration Started: Email={Email}", normalizedEmail);
 
-        var existingUser = await userRepository.GetByEmailAsync(request.Email, cancellationToken);
+        var existingUser = await userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (existingUser is not null)
         {
-            logger.LogWarning("Registration Failed: Email={Email} is already in use", request.Email);
+            logger.LogWarning("Registration Failed: Email={Email} is already in use", normalizedEmail);
             throw new ConflictException("Email is already in use.");
         }
 
         var user = new User
         {
             Id = Guid.NewGuid(),
-            Email = request.Email.ToLowerInvariant(),
+            Email = normalizedEmail,
             FirstName = request.FirstName,
             LastName = request.LastName,
             DisplayName = $"{request.FirstName} {request.LastName}",
@@ -77,18 +80,30 @@ public sealed class AuthenticationService : IAuthenticationService
         string userAgent,
         CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("Login Started: Email={Email}", request.Email);
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        logger.LogInformation("Login Started: Email={Email}", normalizedEmail);
 
-        var user = await userRepository.GetByEmailAsync(request.Email, cancellationToken);
-        if (user is null || !passwordHasher.VerifyPassword(user.PasswordHash, request.Password))
+        var user = await userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
+        
+        if (user is not null && string.IsNullOrEmpty(user.PasswordHash))
         {
-            logger.LogWarning("Login Failed (Invalid Credentials): Email={Email}", request.Email);
+            logger.LogWarning("Login Failed: Legacy user requiring password recovery: Email={Email}", normalizedEmail);
+            throw new BadRequestException("Your account requires a password reset. Please use the password recovery/reset flow.");
+        }
+
+        const string dummyHash = "AQAAAAIAAYagAAAAECH3e/zVx0MtSh3tCwE1iIqkok+GKqozDJZypki9/otAAgi64DacE/NM/tkK4+G8jQ==";
+        var hashToVerify = user?.PasswordHash ?? dummyHash;
+        var isPasswordValid = passwordHasher.VerifyPassword(hashToVerify, request.Password);
+
+        if (user is null || !isPasswordValid)
+        {
+            logger.LogWarning("Login Failed (Invalid Credentials): Email={Email}", normalizedEmail);
             throw new InvalidCredentialsException();
         }
 
         if (!user.IsActive)
         {
-            logger.LogWarning("Login Failed (Inactive User): Email={Email}", request.Email);
+            logger.LogWarning("Login Failed (Inactive User): Email={Email}", normalizedEmail);
             throw new AuthenticationException("User account is inactive.");
         }
 
@@ -103,7 +118,7 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            Token = refreshTokenString,
+            TokenHash = HashToken(refreshTokenString),
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(jwtOptions.Value.RefreshTokenExpiryDays),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByIp = ipAddress,
@@ -165,7 +180,7 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            Token = newRefreshTokenString,
+            TokenHash = HashToken(newRefreshTokenString),
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(jwtOptions.Value.RefreshTokenExpiryDays),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByIp = ipAddress,
@@ -212,5 +227,12 @@ public sealed class AuthenticationService : IAuthenticationService
             return "Tablet";
 
         return "Desktop";
+    }
+
+    private static string HashToken(string token)
+    {
+        var bytes = Encoding.UTF8.GetBytes(token);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToBase64String(hash);
     }
 }

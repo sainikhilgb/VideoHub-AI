@@ -57,7 +57,6 @@ export const RegisterPage: React.FC = () => {
         lastName,
         email,
         password,
-        confirmPassword,
       })
       toast.success('Registration successful! Please sign in.')
       navigate('/login')

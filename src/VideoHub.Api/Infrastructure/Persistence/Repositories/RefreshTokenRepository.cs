@@ -16,8 +16,16 @@ public sealed class RefreshTokenRepository : EfRepository<RefreshToken>, IRefres
 
     public async Task<RefreshToken?> GetByTokenAsync(string token, CancellationToken cancellationToken = default)
     {
+        var hashedToken = HashToken(token);
         return await dbContext.Set<RefreshToken>()
             .Include(rt => rt.User)
-            .FirstOrDefaultAsync(rt => rt.Token == token, cancellationToken);
+            .FirstOrDefaultAsync(rt => rt.TokenHash == hashedToken, cancellationToken);
+    }
+
+    private static string HashToken(string token)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(token);
+        var hash = System.Security.Cryptography.SHA256.HashData(bytes);
+        return Convert.ToBase64String(hash);
     }
 }

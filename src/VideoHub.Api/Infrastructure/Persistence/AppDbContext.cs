@@ -165,7 +165,7 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<RefreshToken>(entity =>
         {
-            entity.HasIndex(rt => rt.Token)
+            entity.HasIndex(rt => rt.TokenHash)
                 .IsUnique();
 
             entity.HasOne(rt => rt.User)

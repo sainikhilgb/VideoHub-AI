@@ -102,7 +102,7 @@ public sealed class ExceptionHandlingMiddleware
                 context,
                 StatusCodes.Status401Unauthorized,
                 "Authentication Failed",
-                ex.Message);
+                "Authentication failed.");
         }
         catch (ForbiddenException ex)
         {
