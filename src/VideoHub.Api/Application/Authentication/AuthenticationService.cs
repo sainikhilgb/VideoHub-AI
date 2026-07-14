@@ -84,18 +84,12 @@ public sealed class AuthenticationService : IAuthenticationService
         logger.LogInformation("Login Started: Email={Email}", normalizedEmail);
 
         var user = await userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
-        
-        if (user is not null && string.IsNullOrEmpty(user.PasswordHash))
-        {
-            logger.LogWarning("Login Failed: Legacy user requiring password recovery: Email={Email}", normalizedEmail);
-            throw new BadRequestException("Your account requires a password reset. Please use the password recovery/reset flow.");
-        }
 
         const string dummyHash = "AQAAAAIAAYagAAAAECH3e/zVx0MtSh3tCwE1iIqkok+GKqozDJZypki9/otAAgi64DacE/NM/tkK4+G8jQ==";
-        var hashToVerify = user?.PasswordHash ?? dummyHash;
+        var hashToVerify = (user is not null && !string.IsNullOrEmpty(user.PasswordHash)) ? user.PasswordHash : dummyHash;
         var isPasswordValid = passwordHasher.VerifyPassword(hashToVerify, request.Password);
 
-        if (user is null || !isPasswordValid)
+        if (user is null || string.IsNullOrEmpty(user.PasswordHash) || !isPasswordValid)
         {
             logger.LogWarning("Login Failed (Invalid Credentials): Email={Email}", normalizedEmail);
             throw new InvalidCredentialsException();

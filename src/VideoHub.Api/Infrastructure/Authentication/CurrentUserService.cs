@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using VideoHub.Api.Application.CurrentUser;
+using VideoHub.Api.Application.Exceptions;
 
 namespace VideoHub.Api.Infrastructure.Authentication;
 
@@ -22,7 +23,7 @@ public sealed class CurrentUserService : ICurrentUserService
             
             if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             {
-                throw new UnauthorizedAccessException("User ID claim is missing or invalid.");
+                throw new UnauthorizedException("User ID claim is missing or invalid.");
             }
             
             return userId;
