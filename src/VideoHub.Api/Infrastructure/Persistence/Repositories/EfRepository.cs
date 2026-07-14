@@ -3,7 +3,7 @@ using VideoHub.Api.Infrastructure.Abstractions;
 
 namespace VideoHub.Api.Infrastructure.Persistence.Repositories;
 
-public sealed class EfRepository<TEntity> : IRepository<TEntity>
+public class EfRepository<TEntity> : IRepository<TEntity>
     where TEntity : class
 {
     private readonly AppDbContext dbContext;

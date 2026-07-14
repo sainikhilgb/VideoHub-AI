@@ -3,6 +3,10 @@ using VideoHub.Api.Infrastructure.DependencyInjection;
 using VideoHub.Api.Infrastructure.Extensions;
 using VideoHub.Api.Infrastructure.Middleware;
 using DotNetEnv;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.SwaggerGen;
+using System.Linq;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,9 +25,10 @@ builder.Services.AddCors(options =>
     {
         if (builder.Environment.IsDevelopment())
         {
-            policy.AllowAnyOrigin()
+            policy.WithOrigins("http://localhost:5173")
                   .AllowAnyMethod()
-                  .AllowAnyHeader();
+                  .AllowAnyHeader()
+                  .AllowCredentials();
         }
         else
         {
@@ -39,7 +44,20 @@ builder.Services.AddCors(options =>
     });
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "VideoHub AI API", Version = "v1" });
+    
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "JWT Authorization header using the Bearer scheme."
+    });
+
+    options.OperationFilter<AuthorizeCheckOperationFilter>();
+});
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
@@ -77,22 +95,33 @@ app.Lifetime.ApplicationStopped.Register(() =>
     app.Logger.LogWarning("Application stopped.");
 });
 
-using (var scope = app.Services.CreateScope())
+app.Run();
+
+public sealed class AuthorizeCheckOperationFilter : IOperationFilter
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<VideoHub.Api.Infrastructure.Persistence.AppDbContext>();
-    var defaultUserId = Guid.Parse("00000000-0000-0000-0000-000000000000");
-    if (!dbContext.Users.Any(u => u.Id == defaultUserId))
+    public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        dbContext.Users.Add(new VideoHub.Api.Domain.Entities.User
+        var hasAuthorize = context.MethodInfo.DeclaringType != null && (
+            context.MethodInfo.DeclaringType.GetCustomAttributes(true).OfType<AuthorizeAttribute>().Any() ||
+            context.MethodInfo.GetCustomAttributes(true).OfType<AuthorizeAttribute>().Any()
+        );
+
+        var hasAllowAnonymous = context.MethodInfo.GetCustomAttributes(true).OfType<AllowAnonymousAttribute>().Any();
+
+        if (hasAuthorize && !hasAllowAnonymous)
         {
-            Id = defaultUserId,
-            Email = "system_default@example.com",
-            Role = "User",
-            DisplayName = "Default Local User",
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        dbContext.SaveChanges();
+            operation.Responses.TryAdd("401", new OpenApiResponse { Description = "Unauthorized" });
+            operation.Responses.TryAdd("403", new OpenApiResponse { Description = "Forbidden" });
+
+            var oAuthScheme = new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            };
+
+            operation.Security = new List<OpenApiSecurityRequirement>
+            {
+                new() { [oAuthScheme] = Array.Empty<string>() }
+            };
+        }
     }
 }
-
-app.Run();

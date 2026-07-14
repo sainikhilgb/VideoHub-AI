@@ -94,6 +94,16 @@ public sealed class ExceptionHandlingMiddleware
                 "Unauthorized",
                 ex.Message);
         }
+        catch (AuthenticationException ex)
+        {
+            logger.LogWarning(ex, "Authentication failed.");
+
+            await WriteProblemDetailsAsync(
+                context,
+                StatusCodes.Status401Unauthorized,
+                "Authentication Failed",
+                "Authentication failed.");
+        }
         catch (ForbiddenException ex)
         {
             logger.LogWarning(ex, "Forbidden request.");

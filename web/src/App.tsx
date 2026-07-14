@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { UIProvider } from '@/app/providers/UIProvider'
+import { AuthProvider } from '@/features/auth/context/AuthContext'
 import { router } from '@/app/router'
 import toast from 'react-hot-toast'
 
@@ -10,7 +11,7 @@ import toast from 'react-hot-toast'
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error: any) => {
-      if (error?.response?.status !== 404) {
+      if (error?.response?.status !== 404 && error?.response?.status !== 401) {
         const errorMessage =
           error?.response?.data?.detail ||
           error?.response?.data?.message ||
@@ -32,22 +33,24 @@ const queryClient = new QueryClient({
 export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <UIProvider>
-        <RouterProvider router={router} />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#ffffff',
-              color: '#0f172a',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              fontSize: '14px',
-            },
-          }}
-        />
-      </UIProvider>
+      <AuthProvider>
+        <UIProvider>
+          <RouterProvider router={router} />
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#ffffff',
+                color: '#0f172a',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '14px',
+              },
+            }}
+          />
+        </UIProvider>
+      </AuthProvider>
     </QueryClientProvider>
   )
 }

@@ -16,7 +16,6 @@ export interface Project {
 export interface ProjectRequest {
   name: string
   originalLanguage: string
-  userId: string
 }
 
 export interface UploadMediaResponse {
@@ -83,12 +82,9 @@ export const useProject = (id: string | undefined) => {
 // 3. Create project
 export const useCreateProject = () => {
   const queryClient = useQueryClient()
-  return useMutation<Project, Error, Omit<ProjectRequest, 'userId'>>({
+  return useMutation<Project, Error, ProjectRequest>({
     mutationFn: async (newProject) => {
-      const response = await apiClient.post<Project>('/v1/projects', {
-        ...newProject,
-        userId: DEFAULT_USER_ID,
-      })
+      const response = await apiClient.post<Project>('/v1/projects', newProject)
       return response.data
     },
     onSuccess: () => {
@@ -237,17 +233,15 @@ export interface UpdateProjectParams {
   projectId: string
   name: string
   originalLanguage: string
-  userId: string
 }
 
 export const useUpdateProject = () => {
   const queryClient = useQueryClient()
   return useMutation<Project, Error, UpdateProjectParams>({
-    mutationFn: async ({ projectId, name, originalLanguage, userId }) => {
+    mutationFn: async ({ projectId, name, originalLanguage }) => {
       const response = await apiClient.put<Project>(`/v1/projects/${projectId}`, {
         name,
         originalLanguage,
-        userId,
       })
       return response.data
     },

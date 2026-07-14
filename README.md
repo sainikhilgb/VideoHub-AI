@@ -146,26 +146,38 @@ The current data model supports the transcription workflow:
 - `GET /api/health`
   - Returns application health status
 
+### Authentication & Identity
+- `POST /api/v1/auth/register`
+  - Register a new user account with secure password complexity checks.
+- `POST /api/v1/auth/login`
+  - Authenticate credentials. Returns a short-lived JSON Web Token (JWT) in the response body and writes a secure, `HttpOnly`, `SameSite=Lax` refresh token cookie.
+- `POST /api/v1/auth/refresh`
+  - Rotates refresh session cookies and issues a new memory-bound JWT access token.
+- `POST /api/v1/auth/logout`
+  - Revokes refresh tokens in the database and cleans up browser cookies.
+- `GET /api/v1/auth/me`
+  - Retrieves the active user's profile details. Requires Bearer JWT authentication header.
+
 ### Projects
 - `GET /api/v1/projects`
-  - Retrieve list of all projects
+  - Retrieve list of projects belonging *only* to the authenticated user.
 - `GET /api/v1/projects/{id}`
-  - Retrieve a project by its unique ID
+  - Retrieve a user-owned project by its unique ID (403 Forbidden on non-owned projects).
 - `POST /api/v1/projects`
-  - Create a new project using request body
+  - Create a new project assigned directly to the authenticated user.
 - `PUT /api/v1/projects/{id}`
-  - Update details of an existing project
+  - Update details of a user-owned project (403 Forbidden on non-owned projects).
 - `DELETE /api/v1/projects/{id}`
-  - Delete a project by ID
+  - Delete a user-owned project (403 Forbidden on non-owned projects).
 
 ### Media Upload
 - `POST /api/v1/projects/{projectId}/media`
-  - Accepts `multipart/form-data` with files
-  - Uploads video/audio files to the configured blob storage provider (Local/Supabase)
-  - Stores metadata in PostgreSQL
-  - Creates a processing job record
-  - Enqueues a Hangfire media-processing placeholder job
-  - Returns `202 Accepted`
+  - Accepts `multipart/form-data` with files. Requires project ownership.
+  - Uploads video/audio files to the configured blob storage provider (Local/Supabase).
+  - Stores metadata in PostgreSQL.
+  - Creates a processing job record.
+  - Enqueues a Hangfire media-processing placeholder job.
+  - Returns `202 Accepted`.
 
 ### Background Jobs
 - `POST /api/jobs/hello-world`
@@ -354,4 +366,4 @@ dotnet dev-certs https --trust
 - The project is currently a single deployable Web API with modular folders, not separate projects per layer.
 - The implementation is intentionally infrastructure-first; business feature work should build on top of this foundation.
 - `appsettings.json` is kept minimal and non-secret; secrets and environment-specific values should live in `.env` or production environment variables.
-- Authentication and project-ownership enforcement for the media upload endpoint are intentionally deferred for the next pass, per the current implementation request.
+- Authentication and project-ownership enforcement are fully implemented across all media upload, project, and background job polling endpoints.
