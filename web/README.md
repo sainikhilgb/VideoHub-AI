@@ -7,8 +7,8 @@ This is the production-ready frontend foundation for VideoHub AI, built using Re
 - **Core**: React 19, TypeScript
 - **Bundler**: Vite 8
 - **Styling**: Tailwind CSS v4 (configured via `@tailwindcss/vite` plugin)
-- **Routing**: React Router v7 (configured via `@/app/router`)
-- **State Management**: TanStack Query (v5) & React Context (for global UI/theme state)
+- **Routing**: React Router v7 (configured with ProtectedRoute & PublicRoute guards)
+- **State Management**: TanStack Query (v5), Auth Context (in-memory access tokens), & UI Context (theme & sidebar state)
 - **HTTP Client**: Axios (configured with request/response interceptors and error handling)
 - **Icons**: Lucide React
 - **Formatting & Linting**: ESLint, Prettier
@@ -23,6 +23,7 @@ web/
 │   │   ├── providers/       # Global React context providers (UIProvider)
 │   │   └── router/          # Route configs mapping pages
 │   ├── features/            # Feature-based business modules
+│   │   ├── auth/            # LoginPage, RegisterPage, contexts, and route guards
 │   │   ├── dashboard/       # Dashboard analytics and charts UI
 │   │   ├── projects/        # Project uploads and detail previews
 │   │   ├── media/           # Media catalogs
