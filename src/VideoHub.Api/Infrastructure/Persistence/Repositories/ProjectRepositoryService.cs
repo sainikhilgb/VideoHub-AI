@@ -22,6 +22,17 @@ public sealed class ProjectRepositoryService : IProjectRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IEnumerable<Project>> GetByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Projects
+            .AsNoTracking()
+            .Where(p => p.UserId == userId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Project?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)

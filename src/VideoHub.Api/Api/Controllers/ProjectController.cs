@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace VideoHub.Api.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/v1/projects")]
 public sealed class ProjectController : ControllerBase

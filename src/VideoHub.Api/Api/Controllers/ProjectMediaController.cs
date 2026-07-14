@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VideoHub.Api.Application.BackgroundJobs;
 using VideoHub.Api.Application.Commands;
+using VideoHub.Api.Application.CurrentUser;
 using VideoHub.Api.Application.DTOs;
 using VideoHub.Api.Application.Uploads;
 using VideoHub.Api.Domain.Entities;
@@ -9,6 +11,7 @@ using VideoHub.Api.Infrastructure.Abstractions;
 
 namespace VideoHub.Api.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/v1/projects/{projectId:guid}/media")]
 public sealed class ProjectMediaController : ControllerBase
@@ -19,6 +22,7 @@ public sealed class ProjectMediaController : ControllerBase
     private readonly IRepository<MediaFile> mediaFileRepository;
     private readonly IRepository<Job> jobRepository;
     private readonly IUnitOfWork unitOfWork;
+    private readonly ICurrentUserService currentUserService;
 
     public ProjectMediaController(
         IMediaUploadService mediaUploadService,
@@ -26,7 +30,8 @@ public sealed class ProjectMediaController : ControllerBase
         IRepository<Project> projectRepository,
         IRepository<MediaFile> mediaFileRepository,
         IRepository<Job> jobRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ICurrentUserService currentUserService)
     {
         this.mediaUploadService = mediaUploadService;
         this.backgroundJobService = backgroundJobService;
@@ -34,6 +39,7 @@ public sealed class ProjectMediaController : ControllerBase
         this.mediaFileRepository = mediaFileRepository;
         this.jobRepository = jobRepository;
         this.unitOfWork = unitOfWork;
+        this.currentUserService = currentUserService;
     }
 
     /// <summary>
@@ -81,6 +87,9 @@ public sealed class ProjectMediaController : ControllerBase
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
         if (project is null) return NotFound($"Project '{projectId}' was not found.");
+
+        if (project.UserId != currentUserService.UserId)
+            return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to access this project.");
 
         var mediaFile = await mediaFileRepository.GetByIdAsync(mediaId, cancellationToken);
         if (mediaFile is null || mediaFile.ProjectId != projectId)

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using VideoHub.Api.Application.BackgroundJobs;
 using VideoHub.Api.Application.Commands;
+using VideoHub.Api.Application.CurrentUser;
 using VideoHub.Api.Application.DTOs;
 using VideoHub.Api.Application.Exceptions;
 using VideoHub.Api.Domain.Entities;
@@ -24,6 +25,7 @@ public sealed class MediaUploadService : IMediaUploadService
     private readonly IBackgroundJobService backgroundJobService;
     private readonly IValidator<SubmitUploadCommand> commandValidator;
     private readonly IOptions<BlobStorageOptions> blobStorageOptions;
+    private readonly ICurrentUserService currentUserService;
     private readonly ILogger<MediaUploadService> logger;
 
     public MediaUploadService(
@@ -36,6 +38,7 @@ public sealed class MediaUploadService : IMediaUploadService
         IBackgroundJobService backgroundJobService,
         IValidator<SubmitUploadCommand> commandValidator,
         IOptions<BlobStorageOptions> blobStorageOptions,
+        ICurrentUserService currentUserService,
         ILogger<MediaUploadService> logger)
     {
         this.projectRepository = projectRepository;
@@ -47,6 +50,7 @@ public sealed class MediaUploadService : IMediaUploadService
         this.backgroundJobService = backgroundJobService;
         this.commandValidator = commandValidator;
         this.blobStorageOptions = blobStorageOptions;
+        this.currentUserService = currentUserService;
         this.logger = logger;
     }
 
@@ -58,6 +62,11 @@ public sealed class MediaUploadService : IMediaUploadService
         if (project is null)
         {
             throw new NotFoundException($"Project '{command.ProjectId}' was not found.");
+        }
+
+        if (project.UserId != currentUserService.UserId)
+        {
+            throw new ForbiddenException("You do not have permission to upload files to this project.");
         }
 
         var mediaType = ResolveMediaType(command.Extension);
