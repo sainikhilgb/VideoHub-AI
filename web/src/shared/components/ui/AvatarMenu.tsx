@@ -1,18 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { User, Settings, LogOut } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/features/auth/context/AuthContext'
 
-interface AvatarMenuProps {
-  user?: {
-    email: string
-    displayName?: string
-  }
-}
-
-export const AvatarMenu: React.FC<AvatarMenuProps> = ({
-  user = { email: 'john.doe@videohub.ai', displayName: 'John Doe' },
-}) => {
+export const AvatarMenu: React.FC = () => {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -26,15 +19,20 @@ export const AvatarMenu: React.FC<AvatarMenuProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('user_email')
+  const handleLogout = async () => {
     setIsOpen(false)
-    toast.success('Logged out successfully')
+    try {
+      await logout()
+      navigate('/login')
+    } catch (err) {
+      console.error('Logout error', err)
+    }
   }
 
-  const initials = user.displayName
-    ? user.displayName
+  const currentUser = user || { email: 'john.doe@videohub.ai', displayName: 'John Doe' }
+
+  const initials = currentUser.displayName
+    ? currentUser.displayName
         .split(' ')
         .map((n) => n[0])
         .join('')
@@ -57,7 +55,7 @@ export const AvatarMenu: React.FC<AvatarMenuProps> = ({
         <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border-custom bg-card py-1.5 shadow-custom-lg ring-1 ring-black/5 focus:outline-none z-50">
           <div className="px-4 py-2 border-b border-border-custom">
             <p className="text-xs text-text-muted">Signed in as</p>
-            <p className="text-sm font-medium text-text-main truncate">{user.email}</p>
+            <p className="text-sm font-medium text-text-main truncate">{currentUser.email}</p>
           </div>
 
           <Link

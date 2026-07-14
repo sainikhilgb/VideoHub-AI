@@ -85,9 +85,10 @@ export const useCreateProject = () => {
   const queryClient = useQueryClient()
   return useMutation<Project, Error, Omit<ProjectRequest, 'userId'>>({
     mutationFn: async (newProject) => {
+      const activeUserId = localStorage.getItem('user_id') || DEFAULT_USER_ID
       const response = await apiClient.post<Project>('/v1/projects', {
         ...newProject,
-        userId: DEFAULT_USER_ID,
+        userId: activeUserId,
       })
       return response.data
     },
