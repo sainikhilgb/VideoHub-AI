@@ -12,13 +12,13 @@ export const authApi = {
     return response.data
   },
 
-  refresh: async (data: { refreshToken: string }): Promise<LoginResponse> => {
-    const response = await apiClient.post<LoginResponse>('/v1/auth/refresh', data)
+  refresh: async (data?: { refreshToken?: string }): Promise<LoginResponse> => {
+    const response = await apiClient.post<LoginResponse>('/v1/auth/refresh', data || {})
     return response.data
   },
 
-  logout: async (data: { refreshToken: string }): Promise<void> => {
-    await apiClient.post('/v1/auth/logout', data)
+  logout: async (data?: { refreshToken?: string }): Promise<void> => {
+    await apiClient.post('/v1/auth/logout', data || {})
   },
 
   getCurrentUser: async (): Promise<UserProfile> => {

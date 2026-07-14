@@ -35,7 +35,7 @@ export const LoginPage: React.FC = () => {
     setIsSubmitting(true)
     try {
       const response = await authApi.login({ email, password })
-      await login(response.accessToken, response.refreshToken, email)
+      await login(response.accessToken, email)
       toast.success('Logged in successfully!')
       navigate('/')
     } catch (error: any) {

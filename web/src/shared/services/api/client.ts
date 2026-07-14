@@ -17,9 +17,20 @@ const getApiBaseUrl = (): string => {
 
 const API_BASE_URL = getApiBaseUrl()
 
+let inMemoryToken: string | null = null
+
+export const setAccessToken = (token: string | null) => {
+  inMemoryToken = token
+}
+
+export const getAccessToken = () => {
+  return inMemoryToken
+}
+
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -28,7 +39,7 @@ export const apiClient: AxiosInstance = axios.create({
 // Request Interceptor: Attach authentication token or correlation headers
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('auth_token')
+    const token = getAccessToken()
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -91,18 +102,21 @@ apiClient.interceptors.response.use(
           })
       }
 
-      originalRequest._retry = true
-      isRefreshing = true
+      const hasSession = !!localStorage.getItem('user_id')
+      if (hasSession) {
+        originalRequest._retry = true
+        isRefreshing = true
 
-      const refreshToken = localStorage.getItem('refresh_token')
-      if (refreshToken) {
         try {
           // Note: Call directly with vanilla axios instance to avoid looping on 401
-          const response = await axios.post(`${API_BASE_URL}/v1/auth/refresh`, { refreshToken })
-          const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data
+          const response = await axios.post(
+            `${API_BASE_URL}/v1/auth/refresh`,
+            {},
+            { withCredentials: true }
+          )
+          const { accessToken: newAccessToken } = response.data
 
-          localStorage.setItem('auth_token', newAccessToken)
-          localStorage.setItem('refresh_token', newRefreshToken)
+          setAccessToken(newAccessToken)
 
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
@@ -112,9 +126,9 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest)
         } catch (refreshError) {
           processQueue(refreshError, null)
-          localStorage.removeItem('auth_token')
-          localStorage.removeItem('refresh_token')
+          setAccessToken(null)
           localStorage.removeItem('user_email')
+          localStorage.removeItem('user_id')
           window.location.href = '/login'
           return Promise.reject(refreshError)
         } finally {

@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { authApi } from '../services/authApi'
 import type { UserProfile } from '../types'
+import { setAccessToken } from '@/shared/services/api/client'
 import toast from 'react-hot-toast'
 
 interface AuthContextType {
   user: UserProfile | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (accessToken: string, refreshToken: string, email: string) => Promise<void>
+  login: (accessToken: string, email: string) => Promise<void>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -24,8 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(profile)
       localStorage.setItem('user_id', profile.id)
     } catch (error) {
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('refresh_token')
+      setAccessToken(null)
       localStorage.removeItem('user_email')
       localStorage.removeItem('user_id')
       setUser(null)
@@ -34,33 +34,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const initializeAuth = async () => {
-      const token = localStorage.getItem('auth_token')
-      if (token) {
-        await refreshProfile()
+      const hasSession = !!localStorage.getItem('user_id')
+      if (hasSession) {
+        try {
+          // Recover session silently
+          const response = await authApi.refresh()
+          setAccessToken(response.accessToken)
+          await refreshProfile()
+        } catch (error) {
+          console.error('Failed to restore auth session', error)
+          setAccessToken(null)
+          localStorage.removeItem('user_email')
+          localStorage.removeItem('user_id')
+          setUser(null)
+        }
       }
       setIsLoading(false)
     }
     initializeAuth()
   }, [])
 
-  const login = async (accessToken: string, refreshToken: string, email: string) => {
-    localStorage.setItem('auth_token', accessToken)
-    localStorage.setItem('refresh_token', refreshToken)
+  const login = async (accessToken: string, email: string) => {
+    setAccessToken(accessToken)
     localStorage.setItem('user_email', email)
     await refreshProfile()
   }
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem('refresh_token')
-    if (refreshToken) {
-      try {
-        await authApi.logout({ refreshToken })
-      } catch (err) {
-        console.error('Logout request failed', err)
-      }
+    try {
+      await authApi.logout()
+    } catch (err) {
+      console.error('Logout request failed', err)
     }
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('refresh_token')
+    setAccessToken(null)
     localStorage.removeItem('user_email')
     localStorage.removeItem('user_id')
     setUser(null)
