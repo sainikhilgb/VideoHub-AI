@@ -21,13 +21,65 @@ from app.core.logging import log_operation, log_context
 logger = logging.getLogger(__name__)
 
 
-async def _post_status(client: httpx.AsyncClient, url: str, payload: dict, headers: dict = None) -> None:
+async def _post_status(client: httpx.AsyncClient, url: str, payload: dict, headers: Optional[dict] = None) -> None:
     """Posts a status update to the .NET API, silently logging failures."""
     try:
         response = await client.post(url, json=payload, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as exc:
         logger.warning("Status callback failed: %s — %s", url, exc)
+
+
+async def _post_status_with_backoff(
+    client: httpx.AsyncClient,
+    url: str,
+    payload: dict,
+    headers: Optional[dict] = None,
+    max_retries: int = 4
+) -> bool:
+    """Posts a status update with bounded exponential backoff. Returns True if successful."""
+    delay = 2.0
+    for attempt in range(max_retries):
+        try:
+            response = await client.post(url, json=payload, headers=headers, timeout=15)
+            response.raise_for_status()
+            logger.info("Status callback succeeded on attempt %s.", attempt + 1)
+            return True
+        except Exception as exc:
+            logger.warning(
+                "Status callback attempt %s failed: %s. Retrying in %s seconds...",
+                attempt + 1, exc, delay
+            )
+            if attempt == max_retries - 1:
+                break
+            await asyncio.sleep(delay)
+            delay = min(delay * 2.0, 30.0)
+    return False
+
+
+async def _persist_recovery_state(request: CombineRequest, payload: dict) -> None:
+    """Saves the callback payload locally and uploads to Supabase storage to prevent orphaned jobs."""
+    try:
+        import json
+        # 1. Local persistence
+        recovery_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "recovery"))
+        os.makedirs(recovery_dir, exist_ok=True)
+        recovery_path = os.path.join(recovery_dir, f"{request.combined_media_id}.json")
+        with open(recovery_path, "w") as f:
+            json.dump(payload, f, indent=2)
+        logger.info("Local recovery payload written to: %s", recovery_path)
+
+        # 2. Supabase Cloud persistence
+        supabase_path = f"{request.output_folder.rstrip('/')}/recovery/{request.combined_media_id}.json"
+        logger.info("Uploading recovery payload to storage bucket: %s", supabase_path)
+        await storage_service.upload_to_supabase(
+            request.bucket,
+            recovery_path,
+            supabase_path,
+            "application/json"
+        )
+    except Exception as recovery_exc:
+        logger.critical("Failed to persist callback recovery state: %s", recovery_exc, exc_info=True)
 
 
 async def _process_language(
@@ -307,8 +359,11 @@ async def run_combine(request: CombineRequest) -> None:
                 # Execute FFmpeg synchronously inside a thread pool to avoid blocking the asyncio loop
                 def run_ffmpeg():
                     try:
-                        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                        res = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=settings.ffmpeg_combine_timeout)
                         logger.info("FFmpeg combine completed successfully: stdout=%s", res.stdout)
+                    except subprocess.TimeoutExpired as err:
+                        logger.error("FFmpeg combine timed out after %s seconds: stdout=%s stderr=%s", err.timeout, err.stdout, err.stderr)
+                        raise Exception(f"FFmpeg combine timed out after {err.timeout} seconds.") from err
                     except subprocess.CalledProcessError as err:
                         logger.error("FFmpeg combine failed with exit code %s: stdout=%s stderr=%s", err.returncode, err.stdout, err.stderr)
                         err_msg = err.stderr or ""
@@ -323,19 +378,27 @@ async def run_combine(request: CombineRequest) -> None:
                     request.bucket, video_output_path, storage_path, "video/mp4"
                 )
 
-                # Send success status callback to .NET
+                # Send success status callback to .NET with backoff retry and fallback cloud persistence
+                success_payload = {
+                    "status": "Completed",
+                    "blobUrl": blob_url
+                }
                 async with httpx.AsyncClient() as client:
-                    await _post_status(client, callback_url, {
-                        "status": "Completed",
-                        "blobUrl": blob_url
-                    }, headers=headers)
+                    success_ok = await _post_status_with_backoff(client, callback_url, success_payload, headers=headers)
+                    if not success_ok:
+                        logger.error("Failed to deliver success callback to .NET API after retries. Saving recovery file.")
+                        await _persist_recovery_state(request, success_payload)
 
     except Exception as exc:
         logger.error("Combined media processing failed: CombinedMediaId=%s error=%s", request.combined_media_id, exc, exc_info=True)
+        failure_payload = {
+            "status": "Failed",
+            "error": str(exc)
+        }
         async with httpx.AsyncClient() as client:
-            await _post_status(client, callback_url, {
-                "status": "Failed",
-                "error": str(exc)
-            }, headers=headers)
+            failure_ok = await _post_status_with_backoff(client, callback_url, failure_payload, headers=headers)
+            if not failure_ok:
+                logger.error("Failed to deliver failure callback to .NET API after retries. Saving recovery file.")
+                await _persist_recovery_state(request, failure_payload)
     finally:
         log_context.reset(token)

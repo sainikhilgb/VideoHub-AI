@@ -54,6 +54,8 @@ public sealed class CombinedMediaController : ControllerBase
             return BadRequest("Invalid muxType. Only 'SoftMux' is supported.");
         }
 
+        dto = dto with { MuxType = "SoftMux" };
+
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
         if (project is null) return NotFound($"Project '{projectId}' was not found.");
 
@@ -101,6 +103,7 @@ public sealed class CombinedMediaController : ControllerBase
         }
         catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "23505")
         {
+            dbContext.Entry(combined).State = EntityState.Detached;
             logger.LogWarning("Concurrent insert detected for combined media MediaFileId={MediaFileId} Language={Language} MuxType={MuxType}. Re-queuing existing entry.", dto.MediaFileId, captionFile.Language, dto.MuxType);
             var concurrentExisting = await dbContext.CombinedMediaFiles
                 .FirstOrDefaultAsync(cm => cm.MediaFileId == dto.MediaFileId && cm.Language == captionFile.Language && cm.MuxType == dto.MuxType, cancellationToken);
