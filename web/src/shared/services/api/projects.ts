@@ -180,6 +180,7 @@ export interface MediaFile {
   fileSize: number
   status: string
   createdAt: string
+  url?: string | null
 }
 
 // 8. Fetch project media files (mocked fallback only if backend 404s)

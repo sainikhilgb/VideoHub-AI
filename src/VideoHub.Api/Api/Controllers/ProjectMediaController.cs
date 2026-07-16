@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Threading;
 using VideoHub.Api.Application.BackgroundJobs;
 using VideoHub.Api.Application.Commands;
 using VideoHub.Api.Application.CurrentUser;
@@ -138,6 +139,7 @@ public sealed class ProjectMediaController : ControllerBase
     public async Task<IActionResult> GetProjectMediaAsync(
         [FromRoute] Guid projectId,
         [FromServices] AppDbContext dbContext,
+        [FromServices] IBlobStorage blobStorage,
         CancellationToken cancellationToken)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
@@ -148,16 +150,44 @@ public sealed class ProjectMediaController : ControllerBase
 
         var projectFiles = await dbContext.MediaFiles
             .Where(mf => mf.ProjectId == projectId)
-            .Select(mf => new ProjectMediaResponseDto(
-                mf.Id,
-                mf.ProjectId,
-                mf.OriginalFileName,
-                mf.MimeType,
-                mf.FileSize,
-                mf.Status,
-                mf.UploadedAt))
             .ToListAsync(cancellationToken);
 
-        return Ok(projectFiles);
+        using var semaphore = new SemaphoreSlim(4);
+        var tasks = projectFiles.Select(async mf =>
+        {
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                var url = await blobStorage.GetSignedUrlAsync(mf.StoragePath, TimeSpan.FromHours(1), cancellationToken);
+                return new { MediaFile = mf, Url = url };
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        var results = await Task.WhenAll(tasks);
+
+        var dtos = new List<ProjectMediaResponseDto>();
+        foreach (var r in results)
+        {
+            if (string.IsNullOrEmpty(r.Url))
+            {
+                return StatusCode(StatusCodes.Status502BadGateway, "Unable to access the private storage asset for media.");
+            }
+
+            dtos.Add(new ProjectMediaResponseDto(
+                r.MediaFile.Id,
+                r.MediaFile.ProjectId,
+                r.MediaFile.OriginalFileName,
+                r.MediaFile.MimeType,
+                r.MediaFile.FileSize,
+                r.MediaFile.Status,
+                r.MediaFile.UploadedAt,
+                r.Url));
+        }
+
+        return Ok(dtos);
     }
 }

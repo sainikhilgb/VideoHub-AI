@@ -9,4 +9,9 @@ public interface IBlobStorage
         CancellationToken cancellationToken = default);
 
     Task DeleteAsync(string blobName, CancellationToken cancellationToken = default);
+
+    Task<string?> GetSignedUrlAsync(
+        string blobPath,
+        TimeSpan expiry,
+        CancellationToken cancellationToken = default);
 }
