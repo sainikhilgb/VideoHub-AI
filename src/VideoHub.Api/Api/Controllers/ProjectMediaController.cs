@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using VideoHub.Api.Application.BackgroundJobs;
 using VideoHub.Api.Application.Commands;
 using VideoHub.Api.Application.CurrentUser;
@@ -8,6 +9,7 @@ using VideoHub.Api.Application.Uploads;
 using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Domain.Jobs;
 using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Infrastructure.Persistence;
 
 namespace VideoHub.Api.Api.Controllers;
 
@@ -123,5 +125,39 @@ public sealed class ProjectMediaController : ControllerBase
         var hangfireJobId = backgroundJobService.QueueMediaProcessingJob(processingJob.Id, mediaFile.Id, correlationId);
 
         return Accepted(new { JobId = processingJob.Id, HangfireJobId = hangfireJobId });
+    }
+
+    /// <summary>
+    /// Retrieves all media files associated with the specified project.
+    /// </summary>
+    [HttpGet]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(IEnumerable<ProjectMediaResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetProjectMediaAsync(
+        [FromRoute] Guid projectId,
+        [FromServices] AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
+        if (project is null) return NotFound($"Project '{projectId}' was not found.");
+
+        if (project.UserId != currentUserService.UserId)
+            return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to access this project.");
+
+        var projectFiles = await dbContext.MediaFiles
+            .Where(mf => mf.ProjectId == projectId)
+            .Select(mf => new ProjectMediaResponseDto(
+                mf.Id,
+                mf.ProjectId,
+                mf.OriginalFileName,
+                mf.MimeType,
+                mf.FileSize,
+                mf.Status,
+                mf.UploadedAt))
+            .ToListAsync(cancellationToken);
+
+        return Ok(projectFiles);
     }
 }

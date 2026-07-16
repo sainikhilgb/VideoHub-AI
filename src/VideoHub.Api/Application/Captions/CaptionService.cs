@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using VideoHub.Api.Application.Exceptions;
@@ -6,6 +7,7 @@ using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Domain.Jobs;
 using VideoHub.Api.Domain.Media;
 using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Infrastructure.Persistence;
 
 namespace VideoHub.Api.Application.Captions;
 
@@ -14,39 +16,36 @@ public sealed class CaptionService : ICaptionService
     private readonly IRepository<CaptionFile> captionFileRepository;
     private readonly IRepository<Job> jobRepository;
     private readonly IRepository<Transcript> transcriptRepository;
-    private readonly IRepository<TranscriptSegment> segmentRepository;
-    private readonly IRepository<Word> wordRepository;
     private readonly IBlobStorage blobStorage;
     private readonly IUnitOfWork unitOfWork;
     private readonly IHttpClientFactory httpClientFactory;
     private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor;
     private readonly IConfiguration configuration;
     private readonly ILogger<CaptionService> logger;
+    private readonly AppDbContext dbContext;
 
     public CaptionService(
         IRepository<CaptionFile> captionFileRepository,
         IRepository<Job> jobRepository,
         IRepository<Transcript> transcriptRepository,
-        IRepository<TranscriptSegment> segmentRepository,
-        IRepository<Word> wordRepository,
         IBlobStorage blobStorage,
         IUnitOfWork unitOfWork,
         IHttpClientFactory httpClientFactory,
         Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
-        ILogger<CaptionService> logger)
+        ILogger<CaptionService> logger,
+        AppDbContext dbContext)
     {
         this.captionFileRepository = captionFileRepository;
         this.jobRepository = jobRepository;
         this.transcriptRepository = transcriptRepository;
-        this.segmentRepository = segmentRepository;
-        this.wordRepository = wordRepository;
         this.blobStorage = blobStorage;
         this.unitOfWork = unitOfWork;
         this.httpClientFactory = httpClientFactory;
         this.httpContextAccessor = httpContextAccessor;
         this.configuration = configuration;
         this.logger = logger;
+        this.dbContext = dbContext;
     }
 
     public async Task DispatchCaptionGenerationAsync(
@@ -183,7 +182,7 @@ public sealed class CaptionService : ICaptionService
     public async Task FinalizeJobAsync(
         Guid jobId,
         string detectedLanguage,
-        IReadOnlyList<TranscriptSegmentDto> segments,
+        string transcriptBlobUrl,
         CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Job Finalization Started: JobId={JobId}", jobId);
@@ -199,45 +198,63 @@ public sealed class CaptionService : ICaptionService
         var anyCompleted = allCaptionFiles.Any(cf => cf.Status == CaptionFileStatuses.Completed);
         var anyFailed = allCaptionFiles.Any(cf => cf.Status == CaptionFileStatuses.Failed);
 
-        if (anyCompleted)
+        if (!string.IsNullOrEmpty(transcriptBlobUrl))
         {
-            // Persist transcript
-            var transcript = new Transcript
+            try
             {
-                Id = Guid.NewGuid(),
-                ProjectId = job.ProjectId,
-                Language = detectedLanguage,
-                Status = "Completed",
-                Version = 1
-            };
-            await transcriptRepository.AddAsync(transcript, cancellationToken);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+                // Check if a transcript already exists for this project, language, and version
+                var allTranscripts = await transcriptRepository.ListAsync(cancellationToken);
+                var existingTranscript = allTranscripts.FirstOrDefault(t => 
+                    t.ProjectId == job.ProjectId && 
+                    t.Language == detectedLanguage && 
+                    t.Version == 1);
 
-            foreach (var seg in segments)
-            {
-                var segment = new TranscriptSegment
+                if (existingTranscript != null)
                 {
-                    Id = Guid.NewGuid(),
-                    TranscriptId = transcript.Id,
-                    StartTime = seg.Start,
-                    EndTime = seg.End,
-                    Text = seg.Text,
-                    Confidence = seg.Confidence
-                };
-                await segmentRepository.AddAsync(segment, cancellationToken);
-                await unitOfWork.SaveChangesAsync(cancellationToken);
-
-                foreach (var word in seg.Words)
+                    existingTranscript.BlobUrl = transcriptBlobUrl;
+                    existingTranscript.Status = "Completed";
+                    transcriptRepository.Update(existingTranscript);
+                }
+                else
                 {
-                    await wordRepository.AddAsync(new Word
+                    // Persist transcript metadata
+                    var transcript = new Transcript
                     {
                         Id = Guid.NewGuid(),
-                        SegmentId = segment.Id,
-                        Text = word.Text,
-                        Start = word.Start,
-                        End = word.End,
-                        Confidence = word.Confidence
-                    }, cancellationToken);
+                        ProjectId = job.ProjectId,
+                        Language = detectedLanguage,
+                        Status = "Completed",
+                        Version = 1,
+                        BlobUrl = transcriptBlobUrl
+                    };
+                    await transcriptRepository.AddAsync(transcript, cancellationToken);
+                }
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "23505")
+            {
+                logger.LogWarning("Concurrent insert detected for transcript: ProjectId={ProjectId}, Language={Language}. Retrying as update.", job.ProjectId, detectedLanguage);
+                
+                // Detach the entity to avoid EF tracking conflicts
+                var trackedTranscript = dbContext.ChangeTracker.Entries<Transcript>().FirstOrDefault();
+                if (trackedTranscript != null)
+                {
+                    trackedTranscript.State = EntityState.Detached;
+                }
+
+                // Query database directly and update
+                var allTranscripts = await transcriptRepository.ListAsync(cancellationToken);
+                var existingTranscript = allTranscripts.FirstOrDefault(t => 
+                    t.ProjectId == job.ProjectId && 
+                    t.Language == detectedLanguage && 
+                    t.Version == 1);
+
+                if (existingTranscript != null)
+                {
+                    existingTranscript.BlobUrl = transcriptBlobUrl;
+                    existingTranscript.Status = "Completed";
+                    transcriptRepository.Update(existingTranscript);
+                    await unitOfWork.SaveChangesAsync(cancellationToken);
                 }
             }
         }
@@ -254,5 +271,29 @@ public sealed class CaptionService : ICaptionService
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Job Finalization Completed: JobId={JobId} FinalStatus={Status}", jobId, job.Status);
+    }
+
+    public async Task<IEnumerable<ProjectCaptionResponseDto>> GetCaptionsByProjectIdAsync(
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var allJobs = await jobRepository.ListAsync(cancellationToken);
+        var projectJobIds = allJobs.Where(j => j.ProjectId == projectId).Select(j => j.Id).ToHashSet();
+
+        var allCaptionFiles = await captionFileRepository.ListAsync(cancellationToken);
+        var projectCaptions = allCaptionFiles
+            .Where(cf => cf.JobId.HasValue && projectJobIds.Contains(cf.JobId.Value))
+            .Select(cf => new ProjectCaptionResponseDto
+            {
+                Id = cf.Id,
+                JobId = cf.JobId,
+                Format = cf.Format,
+                Language = cf.Language,
+                Status = cf.Status,
+                BlobUrl = cf.BlobUrl
+            })
+            .ToList();
+
+        return projectCaptions;
     }
 }

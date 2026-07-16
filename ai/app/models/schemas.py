@@ -66,5 +66,5 @@ class LanguageResult(CamelModel):
 
 class ProcessCallbackPayload(CamelModel):
     detected_language: str
-    segments: list[SegmentResult]
+    transcript_blob_url: str
     language_results: list[LanguageResult]

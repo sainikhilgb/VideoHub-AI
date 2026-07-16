@@ -53,7 +53,13 @@ public sealed class JobsController : ControllerBase
         [FromQuery] string? secret,
         CancellationToken cancellationToken)
     {
-        var expectedSecret = configuration["AiService:CallbackSecret"] ?? "VideoHubAI_Secure_Callback_Secret_2026";
+        var expectedSecret = configuration["AiService:CallbackSecret"];
+        if (string.IsNullOrEmpty(expectedSecret))
+        {
+            logger.LogError("Callback secret is not configured in the host environment.");
+            return StatusCode(StatusCodes.Status500InternalServerError, "Callback secret is not configured.");
+        }
+
         if (string.IsNullOrEmpty(secret))
         {
             if (Request.Headers.TryGetValue("X-Callback-Secret", out var headerSecret))
@@ -68,9 +74,55 @@ public sealed class JobsController : ControllerBase
             return Unauthorized("Invalid callback credentials.");
         }
 
+        if (!string.IsNullOrEmpty(dto.TranscriptBlobUrl))
+        {
+            var configuredOrigin = configuration["BlobStorage:SupabaseUrl"];
+            if (string.IsNullOrEmpty(configuredOrigin))
+            {
+                logger.LogError("Supabase URL is not configured.");
+                return StatusCode(StatusCodes.Status500InternalServerError, "Blob storage URL is not configured.");
+            }
+
+            if (!Uri.TryCreate(configuredOrigin, UriKind.Absolute, out var originUri) ||
+                !Uri.TryCreate(dto.TranscriptBlobUrl, UriKind.Absolute, out var uri) ||
+                uri.Scheme != Uri.UriSchemeHttps ||
+                !string.Equals(originUri.Host, uri.Host, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning("Invalid or mismatched transcript blob URL: {Url}", dto.TranscriptBlobUrl);
+                return BadRequest("Invalid transcript blob URL or origin mismatch.");
+            }
+
+            var path = uri.AbsolutePath;
+            var prefix = "/storage/v1/object/authenticated/";
+            var publicPrefix = "/storage/v1/object/public/";
+            var actualPrefix = path.Contains(prefix) ? prefix : (path.Contains(publicPrefix) ? publicPrefix : null);
+
+            if (actualPrefix == null)
+            {
+                logger.LogWarning("Invalid storage URL structure: {Url}", dto.TranscriptBlobUrl);
+                return BadRequest("Invalid transcript blob URL structure.");
+            }
+
+            var relativePath = path.Substring(path.IndexOf(actualPrefix) + actualPrefix.Length);
+            var parts = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1)
+            {
+                logger.LogWarning("Missing bucket segment in URL: {Url}", dto.TranscriptBlobUrl);
+                return BadRequest("Invalid transcript blob URL bucket.");
+            }
+
+            var bucket = parts[0];
+            var configuredBucket = configuration["BlobStorage:BucketName"] ?? "media";
+            if (!string.Equals(bucket, configuredBucket, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning("Bucket name mismatch: {Bucket} (expected {ConfiguredBucket})", bucket, configuredBucket);
+                return BadRequest("Invalid transcript blob URL bucket.");
+            }
+        }
+
         logger.LogInformation("Job Callback Received: JobId={JobId} DetectedLanguage={Lang}", jobId, dto.DetectedLanguage);
 
-        await captionService.FinalizeJobAsync(jobId, dto.DetectedLanguage, dto.Segments, cancellationToken);
+        await captionService.FinalizeJobAsync(jobId, dto.DetectedLanguage, dto.TranscriptBlobUrl, cancellationToken);
 
         return NoContent();
     }

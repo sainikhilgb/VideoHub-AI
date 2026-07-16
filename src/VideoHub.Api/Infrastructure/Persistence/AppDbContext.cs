@@ -15,8 +15,6 @@ public sealed class AppDbContext : DbContext
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<MediaFile> MediaFiles => Set<MediaFile>();
     public DbSet<Transcript> Transcripts => Set<Transcript>();
-    public DbSet<TranscriptSegment> TranscriptSegments => Set<TranscriptSegment>();
-    public DbSet<Word> Words => Set<Word>();
     public DbSet<Speaker> Speakers => Set<Speaker>();
     public DbSet<Translation> Translations => Set<Translation>();
     public DbSet<CaptionFile> CaptionFiles => Set<CaptionFile>();
@@ -85,26 +83,7 @@ public sealed class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<TranscriptSegment>(entity =>
-        {
-            entity.HasOne(segment => segment.Transcript)
-                .WithMany(transcript => transcript.Segments)
-                .HasForeignKey(segment => segment.TranscriptId)
-                .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(segment => segment.Speaker)
-                .WithMany()
-                .HasForeignKey(segment => segment.SpeakerId)
-                .OnDelete(DeleteBehavior.SetNull);
-        });
-
-        modelBuilder.Entity<Word>(entity =>
-        {
-            entity.HasOne(word => word.Segment)
-                .WithMany(segment => segment.Words)
-                .HasForeignKey(word => word.SegmentId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
 
         modelBuilder.Entity<Speaker>(entity =>
         {

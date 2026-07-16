@@ -1,22 +1,210 @@
-import React from 'react'
-import { useOutletContext } from 'react-router-dom'
-import { FileText, Play } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { useOutletContext, useNavigate } from 'react-router-dom'
+import { FileText, Play, Loader2, Sparkles } from 'lucide-react'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
 import { EmptyState } from '@/shared/components/ui/EmptyState'
-import type { Project } from '@/shared/services/api/projects'
+import {
+  useProjectTranscript,
+  useProjectMedia,
+  useGenerateCaptions,
+  useJobStatus,
+  type Project,
+} from '@/shared/services/api/projects'
+import axios from 'axios'
+import toast from 'react-hot-toast'
+
+interface TranscriptWord {
+  text: string
+  start: number
+  end: number
+  confidence: number | null
+}
+
+interface TranscriptSegment {
+  start: number
+  end: number
+  text: string
+  confidence: number | null
+  words?: TranscriptWord[]
+}
+
+interface TranscriptContent {
+  detectedLanguage: string
+  segments: TranscriptSegment[]
+}
 
 export const ProjectTranscriptTab: React.FC = () => {
   const project = useOutletContext<Project>()
+  const navigate = useNavigate()
+  
+  const [selectedMediaId, setSelectedMediaId] = useState<string>('')
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
+  const [content, setContent] = useState<TranscriptContent | null>(null)
+  const [isContentLoading, setIsContentLoading] = useState(false)
 
-  const isCompleted = project.status.toLowerCase() === 'completed'
+  // API Queries & Mutations
+  const { data: transcriptInfo, isLoading: isMetadataLoading, refetch: refetchTranscript } = useProjectTranscript(
+    project.id,
+    project.originalLanguage,
+    1
+  )
+  const { data: mediaFiles, isLoading: isMediaLoading } = useProjectMedia(project.id)
+  const { data: jobStatus } = useJobStatus(activeJobId ?? undefined, !!activeJobId)
+  const generateCaptions = useGenerateCaptions()
+
+  useEffect(() => {
+    if (mediaFiles && mediaFiles.length > 0 && !selectedMediaId) {
+      setSelectedMediaId(mediaFiles[0].id)
+    }
+  }, [mediaFiles, selectedMediaId])
+
+  useEffect(() => {
+    if (jobStatus) {
+      const status = jobStatus.status.toLowerCase()
+      if (status === 'completed' || status === 'failed') {
+        refetchTranscript()
+        setActiveJobId(null)
+        if (status === 'failed') {
+          toast.error("Speech transcription job failed.")
+        } else {
+          toast.success("Speech transcription completed successfully!")
+        }
+      }
+    }
+  }, [jobStatus, refetchTranscript])
+
+  useEffect(() => {
+    if (transcriptInfo?.blobUrl) {
+      setIsContentLoading(true)
+      const controller = new AbortController()
+
+      axios.get<TranscriptContent>(transcriptInfo.blobUrl, { signal: controller.signal })
+        .then(res => {
+          setContent(res.data)
+        })
+        .catch(err => {
+          if (!axios.isCancel(err)) {
+            console.error("Failed to load transcript JSON", err)
+            setContent(null)
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) {
+            setIsContentLoading(false)
+          }
+        })
+
+      return () => {
+        controller.abort()
+      }
+    } else {
+      setContent(null)
+    }
+  }, [transcriptInfo?.blobUrl])
+
+  const handleTriggerTranscription = async () => {
+    if (!selectedMediaId) {
+      toast.error("Please select a media asset to transcribe.")
+      return
+    }
+
+    const activeMedia = mediaFiles?.find(m => m.id === selectedMediaId)
+    if (!activeMedia) {
+      toast.error("Selected media asset not found.")
+      return
+    }
+
+    const toastId = toast.loading("Queueing speech-to-text transcription job...")
+    try {
+      const result = await generateCaptions.mutateAsync({
+        projectId: project.id,
+        mediaId: activeMedia.id,
+        targetLanguages: [project.originalLanguage],
+      })
+      toast.success("AI Transcription queued successfully!", { id: toastId })
+      if (result?.jobId) {
+        setActiveJobId(result.jobId)
+      } else {
+        refetchTranscript()
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to queue transcription"
+      toast.error(msg, { id: toastId })
+    }
+  }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const isLoading = isMetadataLoading || isContentLoading || isMediaLoading
+  const hasTranscript = content && content.segments.length > 0
+  const hasMedia = mediaFiles && mediaFiles.length > 0
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 text-accent animate-spin mb-2" />
+        <p className="text-xs text-text-muted">Loading speech transcript details...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      {!isCompleted ? (
+      {hasMedia && (
+        <div className="max-w-xs">
+          <label className="block text-[10px] font-bold text-text-muted mb-1.5 uppercase tracking-wider">
+            Active Media File
+          </label>
+          <select
+            value={selectedMediaId}
+            onChange={(e) => setSelectedMediaId(e.target.value)}
+            className="w-full rounded-lg border border-border-custom bg-card px-3 py-1.5 text-xs font-semibold text-text-main focus:border-accent focus:outline-none"
+          >
+            <option value="">-- Choose a media file --</option>
+            {mediaFiles?.map(m => (
+              <option key={m.id} value={m.id}>{m.fileName}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {!hasTranscript ? (
         <EmptyState
           title="Transcript not generated yet"
           description="We are still transcribing speech for this workspace. Check back shortly."
           icon={<FileText className="h-6 w-6 text-accent" />}
+          action={
+            hasMedia ? (
+              <button
+                onClick={handleTriggerTranscription}
+                disabled={generateCaptions.isPending}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white shadow-custom-sm hover:bg-accent-hover transition-colors disabled:opacity-50"
+              >
+                {generateCaptions.isPending ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Queueing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Generate Speech Transcript
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate(`/projects/${project.id}/media`)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white shadow-custom-sm hover:bg-accent-hover transition-colors"
+              >
+                Go to Media Tab
+              </button>
+            )
+          }
         />
       ) : (
         <div className="grid gap-6 md:grid-cols-3">
@@ -26,8 +214,8 @@ export const ProjectTranscriptTab: React.FC = () => {
               <div className="aspect-video w-full rounded-lg bg-slate-900 flex items-center justify-center text-white relative group overflow-hidden">
                 <Play className="h-16 w-16 text-white/80 group-hover:scale-110 group-hover:text-white transition-all cursor-pointer drop-shadow-md" />
                 <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-xs text-white/60 bg-black/40 px-3 py-1.5 rounded-md">
-                  <span>interview_raw.mp4</span>
-                  <span>00:00 / 02:45</span>
+                  <span>Workspace Media</span>
+                  <span>00:00 / --:--</span>
                 </div>
               </div>
             </SectionCard>
@@ -37,29 +225,18 @@ export const ProjectTranscriptTab: React.FC = () => {
               subtitle="Review and correct generated speech segments."
             >
               <div className="space-y-4">
-                <div className="p-3.5 rounded-lg bg-slate-50 border border-border-custom/50 flex gap-4">
-                  <span className="text-xs font-semibold text-accent shrink-0 mt-0.5">
-                    00:00 - 00:08
-                  </span>
-                  <div className="space-y-1 flex-1">
-                    <p className="text-xs font-semibold text-text-main">Speaker 1</p>
-                    <p className="text-sm text-text-main leading-relaxed m-0">
-                      Welcome to VideoHub AI. In this tutorial, we will learn how to initialize the
-                      platform.
-                    </p>
+                {content.segments.map((seg, idx) => (
+                  <div key={idx} className="p-3.5 rounded-lg bg-slate-50 border border-border-custom/50 flex gap-4">
+                    <span className="text-xs font-semibold text-accent shrink-0 mt-0.5">
+                      {formatTime(seg.start)} - {formatTime(seg.end)}
+                    </span>
+                    <div className="space-y-1 flex-1">
+                      <p className="text-sm text-text-main leading-relaxed m-0">
+                        {seg.text}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="p-3.5 rounded-lg bg-slate-50 border border-border-custom/50 flex gap-4">
-                  <span className="text-xs font-semibold text-accent shrink-0 mt-0.5">
-                    00:08 - 00:15
-                  </span>
-                  <div className="space-y-1 flex-1">
-                    <p className="text-xs font-semibold text-text-main">Speaker 2</p>
-                    <p className="text-sm text-text-main leading-relaxed m-0">
-                      Our core stack consists of React 19, TailwindCSS v4, and React Router v7.
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
             </SectionCard>
           </div>
@@ -67,20 +244,40 @@ export const ProjectTranscriptTab: React.FC = () => {
           {/* Quick info */}
           <div className="space-y-6">
             <SectionCard title="Speech Technicals">
-              <dl className="space-y-3 text-xs select-none">
+              <dl className="space-y-3 text-xs select-none mb-4">
                 <div className="flex justify-between py-1 border-b border-border-custom/40">
                   <dt className="text-text-muted">Detected Language</dt>
-                  <dd className="font-semibold text-text-main">English (US)</dd>
+                  <dd className="font-semibold text-text-main">{content.detectedLanguage.toUpperCase()}</dd>
                 </div>
                 <div className="flex justify-between py-1 border-b border-border-custom/40">
-                  <dt className="text-text-muted">Speakers count</dt>
-                  <dd className="font-semibold text-text-main">2 Speakers</dd>
+                  <dt className="text-text-muted">Total Segments</dt>
+                  <dd className="font-semibold text-text-main">{content.segments.length} rows</dd>
                 </div>
                 <div className="flex justify-between py-1 border-b border-border-custom/40">
-                  <dt className="text-text-muted">Diarization Accuracy</dt>
-                  <dd className="font-semibold text-success">98.4% Confidence</dd>
+                  <dt className="text-text-muted">Diarization Context</dt>
+                  <dd className="font-semibold text-success">Optimized Alignment</dd>
                 </div>
               </dl>
+
+              <div className="border-t border-border-custom/40 my-4"></div>
+
+              <button
+                onClick={handleTriggerTranscription}
+                disabled={generateCaptions.isPending}
+                className="flex items-center justify-center gap-2 w-full rounded-lg border border-border-custom bg-card py-2 text-xs font-semibold text-text-main hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {generateCaptions.isPending ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Re-queueing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5 text-accent" />
+                    Re-trigger AI Transcription
+                  </>
+                )}
+              </button>
             </SectionCard>
           </div>
         </div>
