@@ -37,7 +37,10 @@ export const ProjectCaptionsTab: React.FC = () => {
   }, [vttCaptions, selectedVttId])
 
   const handleCombine = async (captionId: string) => {
-    if (!activeMedia) return
+    if (!activeMedia) {
+      toast.error("No active media file is available for combining subtitles.")
+      return
+    }
     const toastId = toast.loading("Queueing subtitles video combining job...")
     try {
       await combineMedia.mutateAsync({
@@ -104,8 +107,9 @@ export const ProjectCaptionsTab: React.FC = () => {
             <div className="space-y-4">
               {vttCaptions.length > 1 && (
                 <div className="flex items-center gap-2 pb-2">
-                  <span className="text-xs font-medium text-text-muted">Select Language Overlay:</span>
+                  <label htmlFor="preview-language-select" className="text-xs font-medium text-text-muted">Select Language Overlay:</label>
                   <select
+                    id="preview-language-select"
                     value={selectedVttId}
                     onChange={(e) => setSelectedVttId(e.target.value)}
                     className="rounded-lg border border-border-custom bg-card px-2.5 py-1 text-xs font-medium text-text-main focus:outline-none focus:ring-1 focus:ring-accent"
@@ -136,8 +140,9 @@ export const ProjectCaptionsTab: React.FC = () => {
               {/* Trigger controls */}
               <div className="flex flex-col sm:flex-row gap-4 p-4 border border-border-custom bg-slate-50/40 rounded-xl">
                 <div className="flex-1 space-y-1">
-                  <span className="text-xs font-semibold text-text-main">Choose Subtitle Language</span>
+                  <label htmlFor="combine-language-select" className="text-xs font-semibold text-text-main">Choose Subtitle Language</label>
                   <select
+                    id="combine-language-select"
                     value={selectedVttId}
                     onChange={(e) => setSelectedVttId(e.target.value)}
                     className="w-full mt-1.5 rounded-lg border border-border-custom bg-card px-3 py-2 text-xs text-text-main focus:outline-none focus:ring-1 focus:ring-accent"
@@ -153,7 +158,7 @@ export const ProjectCaptionsTab: React.FC = () => {
                 <div className="flex items-end">
                   <button
                     type="button"
-                    disabled={combineMedia.isPending || !selectedVttId}
+                    disabled={combineMedia.isPending || !selectedVttId || !activeMedia}
                     onClick={() => handleCombine(selectedVttId)}
                     className="w-full sm:w-auto h-[38px] flex items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:bg-accent/70 transition-colors cursor-pointer"
                   >
@@ -184,6 +189,11 @@ export const ProjectCaptionsTab: React.FC = () => {
                           <span className="text-[10px] text-text-muted">
                             Created: {new Date(cm.createdAt).toLocaleDateString()}
                           </span>
+                          {cm.status === 'Failed' && cm.error && (
+                            <p className="text-[10px] text-danger max-w-[280px] sm:max-w-md mt-1.5 break-words bg-danger/5 p-2 rounded border border-danger/10 font-medium">
+                              Error: {cm.error}
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-3">

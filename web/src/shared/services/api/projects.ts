@@ -313,7 +313,7 @@ export const useProjectTranscript = (projectId: string | undefined, language?: s
   })
 }
 
-// 13. Combined Subtitle Video Muxing (Soft-Mux & Hard-Burn)
+// 13. Combined Subtitle Video Muxing (Soft-Mux)
 export interface CombinedMediaResponse {
   id: string
   projectId: string

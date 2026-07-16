@@ -19,7 +19,7 @@ public sealed class CombinedMedia
 
     [Required]
     [MaxLength(50)]
-    public string MuxType { get; set; } = string.Empty; // "SoftMux" or "HardBurn"
+    public string MuxType { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(50)]

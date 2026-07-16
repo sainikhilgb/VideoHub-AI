@@ -217,7 +217,7 @@ public sealed class BackgroundJobService : IBackgroundJobService
 
         try
         {
-            combined.Status = "Processing";
+            combined.Status = JobStatuses.Processing;
             await dbContext.SaveChangesAsync(cancellationToken);
 
             var mediaFile = await mediaFileRepository.GetByIdAsync(combined.MediaFileId, cancellationToken);
@@ -256,8 +256,13 @@ public sealed class BackgroundJobService : IBackgroundJobService
                 throw new Exception("Failed to generate signed URLs for media or subtitle track.");
             }
 
-            var callbackSecret = configuration["AiService:CallbackSecret"] ?? "VideoHubAI_Secure_Callback_Secret_2026";
-            var callbackUrl = $"/api/v1/combined-media/{combinedMediaId}/status?secret={callbackSecret}";
+            var callbackSecret = configuration["AiService:CallbackSecret"];
+            if (string.IsNullOrWhiteSpace(callbackSecret))
+            {
+                throw new InvalidOperationException("Configuration 'AiService:CallbackSecret' is missing or blank.");
+            }
+
+            var callbackUrl = $"/api/v1/combined-media/{combinedMediaId}/status";
 
             // Target storage folder
             var outputFolder = $"{project.UserId}/{project.Id}/combined/{combined.Language}/";
@@ -273,7 +278,8 @@ public sealed class BackgroundJobService : IBackgroundJobService
                 bucket = mediaFile.Bucket,
                 outputFolder = outputFolder,
                 outputName = outputName,
-                callbackUrl = callbackUrl
+                callbackUrl = callbackUrl,
+                callbackSecret = callbackSecret
             };
 
             var httpClient = httpClientFactory.CreateClient("AiService");
@@ -289,7 +295,7 @@ public sealed class BackgroundJobService : IBackgroundJobService
         }
         catch (Exception exception)
         {
-            combined.Status = "Failed";
+            combined.Status = JobStatuses.Failed;
             combined.Error = exception.Message;
             await dbContext.SaveChangesAsync(cancellationToken);
 

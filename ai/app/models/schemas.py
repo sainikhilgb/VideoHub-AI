@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
@@ -74,9 +74,10 @@ class CombineRequest(CamelModel):
     combined_media_id: str
     video_url: str
     subtitle_url: str
-    mux_type: str
+    mux_type: Literal["SoftMux"]
     language: str
     bucket: str
     output_folder: str
     output_name: str
     callback_url: str
+    callback_secret: str

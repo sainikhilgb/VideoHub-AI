@@ -1,3 +1,5 @@
+using Hangfire;
+
 namespace VideoHub.Api.Application.BackgroundJobs;
 
 public interface IBackgroundJobService
@@ -20,5 +22,6 @@ public interface IBackgroundJobService
 
     string QueueCombinedMediaJob(Guid combinedMediaId);
 
+    [AutomaticRetry(Attempts = 0)]
     Task ExecuteCombinedMediaJobAsync(Guid combinedMediaId, CancellationToken cancellationToken = default);
 }

@@ -21,10 +21,10 @@ from app.core.logging import log_operation, log_context
 logger = logging.getLogger(__name__)
 
 
-async def _post_status(client: httpx.AsyncClient, url: str, payload: dict) -> None:
+async def _post_status(client: httpx.AsyncClient, url: str, payload: dict, headers: dict = None) -> None:
     """Posts a status update to the .NET API, silently logging failures."""
     try:
-        response = await client.post(url, json=payload, timeout=15)
+        response = await client.post(url, json=payload, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as exc:
         logger.warning("Status callback failed: %s — %s", url, exc)
@@ -243,7 +243,6 @@ async def run_combine(request: CombineRequest) -> None:
     1. Downloads both video and subtitle files via HTTP GET.
     2. Runs FFmpeg:
        - Soft-Mux: embeds the subtitle file as a soft track stream.
-       - Hard-Burn: draws the subtitle text directly on the video frames.
     3. Uploads the processed video back to the Supabase storage bucket.
     4. Posts a status callback to the .NET backend.
     """
@@ -251,6 +250,7 @@ async def run_combine(request: CombineRequest) -> None:
     import uuid
     dotnet_base = settings.dotnet_api_base_url
     callback_url = f"{dotnet_base.rstrip('/')}{request.callback_url}"
+    headers = {"Authorization": f"Bearer {request.callback_secret}"}
 
     # Initialize log context
     token = log_context.set({
@@ -312,9 +312,7 @@ async def run_combine(request: CombineRequest) -> None:
                     except subprocess.CalledProcessError as err:
                         logger.error("FFmpeg combine failed with exit code %s: stdout=%s stderr=%s", err.returncode, err.stdout, err.stderr)
                         err_msg = err.stderr or ""
-                        if "No such filter" in err_msg or "No option name near" in err_msg:
-                            err_msg = "FFmpeg is missing the 'subtitles' filter. Hard-burning requires FFmpeg to be compiled with libass support. Please run 'brew reinstall ffmpeg' in your terminal, or use the Soft-Muxed option instead."
-                        raise Exception(err_msg)
+                        raise Exception(f"FFmpeg failed with exit code {err.returncode}: {err_msg}") from err
 
                 await asyncio.to_thread(run_ffmpeg)
 
@@ -330,7 +328,7 @@ async def run_combine(request: CombineRequest) -> None:
                     await _post_status(client, callback_url, {
                         "status": "Completed",
                         "blobUrl": blob_url
-                    })
+                    }, headers=headers)
 
     except Exception as exc:
         logger.error("Combined media processing failed: CombinedMediaId=%s error=%s", request.combined_media_id, exc, exc_info=True)
@@ -338,6 +336,6 @@ async def run_combine(request: CombineRequest) -> None:
             await _post_status(client, callback_url, {
                 "status": "Failed",
                 "error": str(exc)
-            })
+            }, headers=headers)
     finally:
         log_context.reset(token)

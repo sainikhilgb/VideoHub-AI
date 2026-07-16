@@ -162,6 +162,9 @@ public sealed class AppDbContext : DbContext
             entity.Property(cm => cm.Status)
                 .HasMaxLength(50);
 
+            entity.HasIndex(cm => new { cm.MediaFileId, cm.Language, cm.MuxType })
+                .IsUnique();
+
             entity.HasOne(cm => cm.Project)
                 .WithMany()
                 .HasForeignKey(cm => cm.ProjectId)
