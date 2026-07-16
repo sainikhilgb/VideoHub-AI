@@ -1,4 +1,5 @@
 import asyncio
+from typing import Optional
 import logging
 import tempfile
 import os
@@ -61,16 +62,24 @@ async def _persist_recovery_state(request: CombineRequest, payload: dict) -> Non
     """Saves the callback payload locally and uploads to Supabase storage to prevent orphaned jobs."""
     try:
         import json
+        import uuid
+
+        # Sanitize and validate request.combined_media_id to reject traversal strings
+        try:
+            clean_id = str(uuid.UUID(str(request.combined_media_id)))
+        except ValueError as err:
+            raise ValueError(f"Invalid combined_media_id format: '{request.combined_media_id}' is not a valid UUID.") from err
+
         # 1. Local persistence
         recovery_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "recovery"))
         os.makedirs(recovery_dir, exist_ok=True)
-        recovery_path = os.path.join(recovery_dir, f"{request.combined_media_id}.json")
+        recovery_path = os.path.join(recovery_dir, f"{clean_id}.json")
         with open(recovery_path, "w") as f:
             json.dump(payload, f, indent=2)
         logger.info("Local recovery payload written to: %s", recovery_path)
 
         # 2. Supabase Cloud persistence
-        supabase_path = f"{request.output_folder.rstrip('/')}/recovery/{request.combined_media_id}.json"
+        supabase_path = f"{request.output_folder.rstrip('/')}/recovery/{clean_id}.json"
         logger.info("Uploading recovery payload to storage bucket: %s", supabase_path)
         await storage_service.upload_to_supabase(
             request.bucket,

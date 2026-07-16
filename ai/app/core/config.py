@@ -1,4 +1,4 @@
-from pydantic import SecretStr
+from pydantic import SecretStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     whisper_model_size: str = "base"  # base | small | medium | large-v3
     whisper_device: str = "cpu"       # cpu | cuda
     whisper_compute_type: str = "int8"
-    ffmpeg_combine_timeout: int = 600
+    ffmpeg_combine_timeout: int = Field(default=600, gt=0)
 
     model_config = SettingsConfigDict(
         env_file=".env",
