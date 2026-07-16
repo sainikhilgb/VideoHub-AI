@@ -9,4 +9,5 @@ public sealed record ProjectMediaResponseDto(
     string ContentType,
     long FileSize,
     string Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? Url);

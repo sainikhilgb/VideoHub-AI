@@ -86,9 +86,7 @@ public sealed class ProjectController : ControllerBase
         [FromServices] IRepository<Project> projectRepository,
         [FromServices] AppDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
-        [FromServices] IConfiguration configuration,
-        [FromServices] ILogger<ProjectController> logger,
-        [FromServices] IHttpClientFactory httpClientFactory,
+        [FromServices] IBlobStorage blobStorage,
         CancellationToken cancellationToken)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
@@ -108,7 +106,7 @@ public sealed class ProjectController : ControllerBase
             var responseUrl = transcript.BlobUrl;
             if (!string.IsNullOrEmpty(responseUrl) && responseUrl.Contains("/storage/v1/object/authenticated/"))
             {
-                responseUrl = await GenerateSignedUrlAsync(responseUrl, configuration, logger, httpClientFactory, cancellationToken);
+                responseUrl = await blobStorage.GetSignedUrlAsync(responseUrl, TimeSpan.FromHours(1), cancellationToken);
                 if (string.IsNullOrEmpty(responseUrl))
                 {
                     return StatusCode(StatusCodes.Status502BadGateway, "Unable to access the private storage asset.");
@@ -142,7 +140,7 @@ public sealed class ProjectController : ControllerBase
                 var responseUrl = t.BlobUrl;
                 if (!string.IsNullOrEmpty(responseUrl) && responseUrl.Contains("/storage/v1/object/authenticated/"))
                 {
-                    responseUrl = await GenerateSignedUrlAsync(responseUrl, configuration, logger, httpClientFactory, cancellationToken);
+                    responseUrl = await blobStorage.GetSignedUrlAsync(responseUrl, TimeSpan.FromHours(1), cancellationToken);
                     if (string.IsNullOrEmpty(responseUrl))
                     {
                         return StatusCode(StatusCodes.Status502BadGateway, "Unable to access one or more private storage assets.");
@@ -153,81 +151,5 @@ public sealed class ProjectController : ControllerBase
 
             return Ok(dtos);
         }
-    }
-
-    private async Task<string?> GenerateSignedUrlAsync(
-        string privateUrl,
-        IConfiguration configuration,
-        ILogger<ProjectController> logger,
-        IHttpClientFactory httpClientFactory,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var uri = new Uri(privateUrl);
-            var pathAndQuery = uri.AbsolutePath;
-            var prefix = "/storage/v1/object/authenticated/";
-            if (pathAndQuery.Contains(prefix))
-            {
-                var index = pathAndQuery.IndexOf(prefix);
-                var relativePath = pathAndQuery.Substring(index + prefix.Length);
-                var parts = relativePath.Split('/', 2);
-                if (parts.Length == 2)
-                {
-                    var bucket = parts[0];
-                    var objectPath = parts[1];
-
-                    var supabaseUrl = configuration["BlobStorage:SupabaseUrl"];
-                    var supabaseKey = configuration["BlobStorage:SupabaseKey"];
-
-                    if (string.IsNullOrEmpty(supabaseUrl) || string.IsNullOrEmpty(supabaseKey))
-                    {
-                        logger.LogWarning("Supabase credentials are not configured in the host environment.");
-                        return null;
-                    }
-
-                    using var client = httpClientFactory.CreateClient();
-                    client.BaseAddress = new Uri(supabaseUrl.TrimEnd('/') + "/");
-                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", supabaseKey);
-                    client.DefaultRequestHeaders.Add("apikey", supabaseKey);
-
-                    var response = await client.PostAsJsonAsync(
-                        $"storage/v1/object/sign/{Uri.EscapeDataString(bucket)}/{objectPath}",
-                        new { expiresIn = 3600 },
-                        cancellationToken);
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var result = await response.Content.ReadFromJsonAsync<SupabaseSignedUrlResponse>(cancellationToken);
-                        if (result != null && !string.IsNullOrEmpty(result.SignedURL))
-                        {
-                            var signedPath = result.SignedURL;
-                            if (signedPath.StartsWith("/"))
-                            {
-                                return $"{supabaseUrl.TrimEnd('/')}{signedPath}";
-                            }
-                            return signedPath;
-                        }
-                    }
-                    else
-                    {
-                        var err = await response.Content.ReadAsStringAsync(cancellationToken);
-                        logger.LogWarning("Supabase sign request failed: Status={Status} Body={Body}", response.StatusCode, err);
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to generate signed URL for {Url}", privateUrl);
-        }
-
-        return null;
-    }
-
-    private sealed class SupabaseSignedUrlResponse
-    {
-        [JsonPropertyName("signedURL")]
-        public string SignedURL { get; set; } = string.Empty;
     }
 }

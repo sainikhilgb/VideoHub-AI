@@ -1,4 +1,6 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using VideoHub.Api.Infrastructure.Abstractions;
 using VideoHub.Api.Infrastructure.Options;
@@ -72,5 +74,90 @@ public sealed class SupabaseBlobStorage : IBlobStorage
         using var emptyStream = new MemoryStream();
         await UploadAsync(emptyStream, keepFilePath, "application/octet-stream", cancellationToken);
         return folderPath;
+    }
+
+    public async Task<string?> GetSignedUrlAsync(
+        string blobPath,
+        TimeSpan expiry,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            string relativePath = blobPath;
+            string bucket = options.BucketName!;
+
+            var prefix = "/storage/v1/object/authenticated/";
+            var publicPrefix = "/storage/v1/object/public/";
+            var actualPrefix = blobPath.Contains(prefix) ? prefix : (blobPath.Contains(publicPrefix) ? publicPrefix : null);
+
+            if (actualPrefix != null)
+            {
+                var index = blobPath.IndexOf(actualPrefix);
+                var pathAfterPrefix = blobPath.Substring(index + actualPrefix.Length);
+                var parts = pathAfterPrefix.Split('/', 2);
+                if (parts.Length == 2)
+                {
+                    bucket = parts[0];
+                    relativePath = parts[1];
+                }
+            }
+            else if (Uri.TryCreate(blobPath, UriKind.Absolute, out var uri))
+            {
+                var pathAndQuery = uri.AbsolutePath;
+                var resolvedPrefix = pathAndQuery.Contains(prefix) ? prefix : (pathAndQuery.Contains(publicPrefix) ? publicPrefix : null);
+                if (resolvedPrefix != null)
+                {
+                    var index = pathAndQuery.IndexOf(resolvedPrefix);
+                    var pathAfterPrefix = pathAndQuery.Substring(index + resolvedPrefix.Length);
+                    var parts = pathAfterPrefix.Split('/', 2);
+                    if (parts.Length == 2)
+                    {
+                        bucket = parts[0];
+                        relativePath = parts[1];
+                    }
+                }
+            }
+
+            var encodedSegments = relativePath
+                .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Select(Uri.EscapeDataString);
+            var objectPath = string.Join('/', encodedSegments);
+
+            using var response = await httpClient.PostAsJsonAsync(
+                $"storage/v1/object/sign/{Uri.EscapeDataString(bucket)}/{objectPath}",
+                new { expiresIn = (int)expiry.TotalSeconds },
+                cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<SupabaseSignedUrlResponse>(cancellationToken);
+                if (result != null && !string.IsNullOrEmpty(result.SignedURL))
+                {
+                    var signedPath = result.SignedURL;
+                    if (signedPath.StartsWith("/object/sign/"))
+                    {
+                        signedPath = "/storage/v1" + signedPath;
+                    }
+
+                    if (signedPath.StartsWith("/"))
+                    {
+                        return $"{options.SupabaseUrl!.TrimEnd('/')}{signedPath}";
+                    }
+                    return signedPath;
+                }
+            }
+        }
+        catch
+        {
+            // Fail-closed, bubble up or return null
+        }
+
+        return null;
+    }
+
+    private sealed class SupabaseSignedUrlResponse
+    {
+        [JsonPropertyName("signedURL")]
+        public string SignedURL { get; set; } = string.Empty;
     }
 }

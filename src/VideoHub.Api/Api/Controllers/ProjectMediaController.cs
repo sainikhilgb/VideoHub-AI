@@ -138,6 +138,7 @@ public sealed class ProjectMediaController : ControllerBase
     public async Task<IActionResult> GetProjectMediaAsync(
         [FromRoute] Guid projectId,
         [FromServices] AppDbContext dbContext,
+        [FromServices] IBlobStorage blobStorage,
         CancellationToken cancellationToken)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
@@ -148,16 +149,28 @@ public sealed class ProjectMediaController : ControllerBase
 
         var projectFiles = await dbContext.MediaFiles
             .Where(mf => mf.ProjectId == projectId)
-            .Select(mf => new ProjectMediaResponseDto(
+            .ToListAsync(cancellationToken);
+
+        var dtos = new List<ProjectMediaResponseDto>();
+        foreach (var mf in projectFiles)
+        {
+            var url = await blobStorage.GetSignedUrlAsync(mf.StoragePath, TimeSpan.FromHours(1), cancellationToken);
+            if (string.IsNullOrEmpty(url))
+            {
+                return StatusCode(StatusCodes.Status502BadGateway, "Unable to access the private storage asset for media.");
+            }
+
+            dtos.Add(new ProjectMediaResponseDto(
                 mf.Id,
                 mf.ProjectId,
                 mf.OriginalFileName,
                 mf.MimeType,
                 mf.FileSize,
                 mf.Status,
-                mf.UploadedAt))
-            .ToListAsync(cancellationToken);
+                mf.UploadedAt,
+                url));
+        }
 
-        return Ok(projectFiles);
+        return Ok(dtos);
     }
 }

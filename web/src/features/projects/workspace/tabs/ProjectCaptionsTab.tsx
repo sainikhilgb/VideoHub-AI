@@ -3,12 +3,14 @@ import { useOutletContext } from 'react-router-dom'
 import { Subtitles, Download, Loader2 } from 'lucide-react'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
 import { EmptyState } from '@/shared/components/ui/EmptyState'
-import { useProjectCaptions, type Project } from '@/shared/services/api/projects'
+import { useProjectCaptions, useProjectMedia, type Project } from '@/shared/services/api/projects'
+import { MediaPlayer } from '@/shared/components/ui/MediaPlayer'
 
 export const ProjectCaptionsTab: React.FC = () => {
   const project = useOutletContext<Project>()
   
   const { data: captions, isLoading } = useProjectCaptions(project.id)
+  const { data: mediaFiles } = useProjectMedia(project.id)
 
   if (isLoading) {
     return (
@@ -21,6 +23,8 @@ export const ProjectCaptionsTab: React.FC = () => {
 
   const completedCaptions = captions?.filter(c => c.status.toLowerCase() === 'completed' && !!c.blobUrl) || []
   const hasCaptions = completedCaptions.length > 0
+  const activeMedia = mediaFiles && mediaFiles.length > 0 ? mediaFiles[0] : null
+  const vttCaption = completedCaptions.find(c => c.format.toLowerCase() === 'vtt')
 
   return (
     <div className="space-y-6">
@@ -61,12 +65,13 @@ export const ProjectCaptionsTab: React.FC = () => {
             </div>
           </SectionCard>
 
-          <SectionCard title="Subtitle Preview Frame" subtitle="Review line layouts.">
-            <div className="aspect-video w-full max-w-lg mx-auto rounded-lg bg-slate-900 flex items-end justify-center pb-8 text-white relative overflow-hidden shadow-custom-md">
-              <span className="bg-black/75 px-4 py-1.5 rounded-md text-sm font-medium tracking-wide">
-                Welcome to VideoHub AI. In this tutorial...
-              </span>
-            </div>
+          <SectionCard title="Subtitle Playback Preview" subtitle="Review line layouts overlaying media.">
+            <MediaPlayer
+              src={activeMedia?.url}
+              contentType={activeMedia?.contentType}
+              vttUrl={vttCaption?.blobUrl}
+              vttLanguage={vttCaption?.language}
+            />
           </SectionCard>
         </div>
       )}

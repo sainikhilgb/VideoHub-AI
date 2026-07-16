@@ -44,4 +44,12 @@ public sealed class LocalBlobStorage : IBlobStorage
         Directory.CreateDirectory(fullPath);
         return Task.FromResult(fullPath);
     }
+
+    public Task<string?> GetSignedUrlAsync(
+        string blobPath,
+        TimeSpan expiry,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<string?>(blobPath);
+    }
 }

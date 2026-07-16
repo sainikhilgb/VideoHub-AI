@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { FileText, Play, Loader2, Sparkles } from 'lucide-react'
+import { FileText, Loader2, Sparkles } from 'lucide-react'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
 import { EmptyState } from '@/shared/components/ui/EmptyState'
+import { MediaPlayer } from '@/shared/components/ui/MediaPlayer'
 import {
   useProjectTranscript,
   useProjectMedia,
@@ -41,6 +42,8 @@ export const ProjectTranscriptTab: React.FC = () => {
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [content, setContent] = useState<TranscriptContent | null>(null)
   const [isContentLoading, setIsContentLoading] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const playerRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
 
   // API Queries & Mutations
   const { data: transcriptInfo, isLoading: isMetadataLoading, refetch: refetchTranscript } = useProjectTranscript(
@@ -51,6 +54,21 @@ export const ProjectTranscriptTab: React.FC = () => {
   const { data: mediaFiles, isLoading: isMediaLoading } = useProjectMedia(project.id)
   const { data: jobStatus } = useJobStatus(activeJobId ?? undefined, !!activeJobId)
   const generateCaptions = useGenerateCaptions()
+
+  const activeMedia = mediaFiles?.find(m => m.id === selectedMediaId)
+
+  const activeSegmentIndex = content?.segments.findIndex(
+    seg => currentTime >= seg.start && currentTime <= seg.end
+  ) ?? -1
+
+  useEffect(() => {
+    if (activeSegmentIndex !== -1) {
+      const activeEl = document.getElementById(`segment-${activeSegmentIndex}`)
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    }
+  }, [activeSegmentIndex])
 
   useEffect(() => {
     if (mediaFiles && mediaFiles.length > 0 && !selectedMediaId) {
@@ -108,7 +126,6 @@ export const ProjectTranscriptTab: React.FC = () => {
       return
     }
 
-    const activeMedia = mediaFiles?.find(m => m.id === selectedMediaId)
     if (!activeMedia) {
       toast.error("Selected media asset not found.")
       return
@@ -210,33 +227,49 @@ export const ProjectTranscriptTab: React.FC = () => {
         <div className="grid gap-6 md:grid-cols-3">
           {/* Main timeline */}
           <div className="md:col-span-2 space-y-6">
-            <SectionCard title="Video Preview" subtitle="Review output and video media file.">
-              <div className="aspect-video w-full rounded-lg bg-slate-900 flex items-center justify-center text-white relative group overflow-hidden">
-                <Play className="h-16 w-16 text-white/80 group-hover:scale-110 group-hover:text-white transition-all cursor-pointer drop-shadow-md" />
-                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-xs text-white/60 bg-black/40 px-3 py-1.5 rounded-md">
-                  <span>Workspace Media</span>
-                  <span>00:00 / --:--</span>
-                </div>
-              </div>
+            <SectionCard title="Media Playback Preview" subtitle="Review output and synchronize video/audio media.">
+              <MediaPlayer
+                src={activeMedia?.url}
+                contentType={activeMedia?.contentType}
+                onTimeUpdate={setCurrentTime}
+                playerRef={playerRef}
+              />
             </SectionCard>
 
             <SectionCard
               title="Speech Transcript editor"
               subtitle="Review and correct generated speech segments."
             >
-              <div className="space-y-4">
-                {content.segments.map((seg, idx) => (
-                  <div key={idx} className="p-3.5 rounded-lg bg-slate-50 border border-border-custom/50 flex gap-4">
-                    <span className="text-xs font-semibold text-accent shrink-0 mt-0.5">
-                      {formatTime(seg.start)} - {formatTime(seg.end)}
-                    </span>
-                    <div className="space-y-1 flex-1">
-                      <p className="text-sm text-text-main leading-relaxed m-0">
-                        {seg.text}
-                      </p>
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                {content.segments.map((seg, idx) => {
+                  const isActive = idx === activeSegmentIndex
+                  return (
+                    <div
+                      key={idx}
+                      id={`segment-${idx}`}
+                      onClick={() => {
+                        if (playerRef.current) {
+                          playerRef.current.currentTime = seg.start
+                          playerRef.current.play().catch(() => {})
+                        }
+                      }}
+                      className={`p-3.5 rounded-lg border transition-all flex gap-4 cursor-pointer select-none ${
+                        isActive
+                          ? 'bg-accent/5 border-accent shadow-sm ring-1 ring-accent/20'
+                          : 'bg-slate-50 border-border-custom/50 hover:bg-slate-100/50'
+                      }`}
+                    >
+                      <span className="text-xs font-semibold text-accent shrink-0 mt-0.5">
+                        {formatTime(seg.start)} - {formatTime(seg.end)}
+                      </span>
+                      <div className="space-y-1 flex-1">
+                        <p className="text-sm text-text-main leading-relaxed m-0">
+                          {seg.text}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </SectionCard>
           </div>
