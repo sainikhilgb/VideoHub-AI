@@ -7,6 +7,7 @@ import {
   useProjectTranscript,
   useProjectMedia,
   useGenerateCaptions,
+  useJobStatus,
   type Project,
 } from '@/shared/services/api/projects'
 import axios from 'axios'
@@ -36,49 +37,96 @@ export const ProjectTranscriptTab: React.FC = () => {
   const project = useOutletContext<Project>()
   const navigate = useNavigate()
   
-  // API Queries & Mutations
-  const { data: transcriptInfo, isLoading: isMetadataLoading, refetch: refetchTranscript } = useProjectTranscript(project.id)
-  const { data: mediaFiles, isLoading: isMediaLoading } = useProjectMedia(project.id)
-  const generateCaptions = useGenerateCaptions()
-
+  const [selectedMediaId, setSelectedMediaId] = useState<string>('')
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [content, setContent] = useState<TranscriptContent | null>(null)
   const [isContentLoading, setIsContentLoading] = useState(false)
+
+  // API Queries & Mutations
+  const { data: transcriptInfo, isLoading: isMetadataLoading, refetch: refetchTranscript } = useProjectTranscript(
+    project.id,
+    project.originalLanguage,
+    1
+  )
+  const { data: mediaFiles, isLoading: isMediaLoading } = useProjectMedia(project.id)
+  const { data: jobStatus } = useJobStatus(activeJobId ?? undefined, !!activeJobId)
+  const generateCaptions = useGenerateCaptions()
+
+  useEffect(() => {
+    if (mediaFiles && mediaFiles.length > 0 && !selectedMediaId) {
+      setSelectedMediaId(mediaFiles[0].id)
+    }
+  }, [mediaFiles, selectedMediaId])
+
+  useEffect(() => {
+    if (jobStatus) {
+      const status = jobStatus.status.toLowerCase()
+      if (status === 'completed' || status === 'failed') {
+        refetchTranscript()
+        setActiveJobId(null)
+        if (status === 'failed') {
+          toast.error("Speech transcription job failed.")
+        } else {
+          toast.success("Speech transcription completed successfully!")
+        }
+      }
+    }
+  }, [jobStatus, refetchTranscript])
 
   useEffect(() => {
     if (transcriptInfo?.blobUrl) {
       setIsContentLoading(true)
-      axios.get<TranscriptContent>(transcriptInfo.blobUrl)
+      const controller = new AbortController()
+
+      axios.get<TranscriptContent>(transcriptInfo.blobUrl, { signal: controller.signal })
         .then(res => {
           setContent(res.data)
-          setIsContentLoading(false)
         })
         .catch(err => {
-          console.error("Failed to load transcript JSON", err)
-          setContent(null)
-          setIsContentLoading(false)
+          if (!axios.isCancel(err)) {
+            console.error("Failed to load transcript JSON", err)
+            setContent(null)
+          }
         })
+        .finally(() => {
+          if (!controller.signal.aborted) {
+            setIsContentLoading(false)
+          }
+        })
+
+      return () => {
+        controller.abort()
+      }
     } else {
       setContent(null)
     }
   }, [transcriptInfo?.blobUrl])
 
   const handleTriggerTranscription = async () => {
-    const activeMedia = mediaFiles?.[0]
+    if (!selectedMediaId) {
+      toast.error("Please select a media asset to transcribe.")
+      return
+    }
+
+    const activeMedia = mediaFiles?.find(m => m.id === selectedMediaId)
     if (!activeMedia) {
-      toast.error("No media asset found to transcribe. Please upload a file first.")
+      toast.error("Selected media asset not found.")
       return
     }
 
     const toastId = toast.loading("Queueing speech-to-text transcription job...")
     try {
-      await generateCaptions.mutateAsync({
+      const result = await generateCaptions.mutateAsync({
         projectId: project.id,
         mediaId: activeMedia.id,
         targetLanguages: [project.originalLanguage],
       })
       toast.success("AI Transcription queued successfully!", { id: toastId })
-      // Poll/refetch transcript status metadata
-      refetchTranscript()
+      if (result?.jobId) {
+        setActiveJobId(result.jobId)
+      } else {
+        refetchTranscript()
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to queue transcription"
       toast.error(msg, { id: toastId })
@@ -106,6 +154,24 @@ export const ProjectTranscriptTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {hasMedia && (
+        <div className="max-w-xs">
+          <label className="block text-[10px] font-bold text-text-muted mb-1.5 uppercase tracking-wider">
+            Active Media File
+          </label>
+          <select
+            value={selectedMediaId}
+            onChange={(e) => setSelectedMediaId(e.target.value)}
+            className="w-full rounded-lg border border-border-custom bg-card px-3 py-1.5 text-xs font-semibold text-text-main focus:border-accent focus:outline-none"
+          >
+            <option value="">-- Choose a media file --</option>
+            {mediaFiles?.map(m => (
+              <option key={m.id} value={m.id}>{m.fileName}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {!hasTranscript ? (
         <EmptyState
           title="Transcript not generated yet"
@@ -165,9 +231,6 @@ export const ProjectTranscriptTab: React.FC = () => {
                       {formatTime(seg.start)} - {formatTime(seg.end)}
                     </span>
                     <div className="space-y-1 flex-1">
-                      <p className="text-xs font-semibold text-text-main">
-                        Speaker {idx % 2 === 0 ? '1' : '2'}
-                      </p>
                       <p className="text-sm text-text-main leading-relaxed m-0">
                         {seg.text}
                       </p>

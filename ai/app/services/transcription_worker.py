@@ -98,6 +98,8 @@ async def run(request: ProcessRequest) -> None:
     5. Sends the final callback to .NET.
     """
     dotnet_base = settings.dotnet_api_base_url
+    completed_languages = set()
+    language_results = []
     
     # Initialize background task log context using incoming request identifiers
     token = log_context.set({
@@ -141,7 +143,10 @@ async def run(request: ProcessRequest) -> None:
                             _process_language(client, request.bucket, lang, segments, dotnet_base)
                             for lang in request.languages
                         ]
-                        language_results: list[LanguageResult] = await asyncio.gather(*tasks)
+                        language_results = await asyncio.gather(*tasks)
+                        for res in language_results:
+                            if res.status == "Completed":
+                                completed_languages.add(res.language_code)
 
                     # Step 5: Compile segments to transcript.json and upload
                     import json
@@ -150,11 +155,12 @@ async def run(request: ProcessRequest) -> None:
                         "segments": [seg.model_dump(by_alias=True) for seg in segments]
                     }
 
-                    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as tmp:
-                        json.dump(transcript_data, tmp, ensure_ascii=False, indent=2)
-                        tmp_path = tmp.name
-
+                    tmp_path = None
                     try:
+                        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as tmp:
+                            tmp_path = tmp.name
+                            json.dump(transcript_data, tmp, ensure_ascii=False, indent=2)
+
                         path_parts = request.storage_path.strip("/").split("/")
                         if len(path_parts) < 2:
                             raise ValueError(f"Invalid media storage path format: {request.storage_path}")
@@ -166,7 +172,8 @@ async def run(request: ProcessRequest) -> None:
                             request.bucket, tmp_path, transcript_storage_path, "application/json"
                         )
                     finally:
-                        os.unlink(tmp_path)
+                        if tmp_path and os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
 
                     # Step 6: Final callback to .NET
                     with log_operation("final_callback_dotnet"):
@@ -187,10 +194,19 @@ async def run(request: ProcessRequest) -> None:
     except Exception as exc:
         logger.error("Job execution failed globally: job_id=%s error=%s", request.job_id, exc, exc_info=True)
         
-        # Notify .NET of the failures for all requested caption files
+        # Notify .NET of the failures only for caption files that were not completed successfully
         async with httpx.AsyncClient() as client:
-            language_results = []
+            final_language_results = []
+            
+            # Map existing results for easy lookup
+            existing_results = {r.language_code: r for r in language_results}
+            
             for lang in request.languages:
+                if lang.language_code in completed_languages:
+                    if lang.language_code in existing_results:
+                        final_language_results.append(existing_results[lang.language_code])
+                    continue
+                
                 for fmt, caption_file_id in lang.caption_file_ids.items():
                     status_url = f"{dotnet_base.rstrip('/')}/api/v1/caption-files/{caption_file_id}/status"
                     await _post_status(client, status_url, CaptionStatusCallback(
@@ -198,7 +214,7 @@ async def run(request: ProcessRequest) -> None:
                         error=f"Job failed globally: {str(exc)}",
                     ).model_dump(by_alias=True))
                 
-                language_results.append(LanguageResult(
+                final_language_results.append(LanguageResult(
                     language_code=lang.language_code,
                     status="Failed",
                     error=str(exc)
@@ -209,7 +225,7 @@ async def run(request: ProcessRequest) -> None:
             payload = ProcessCallbackPayload(
                 detected_language=request.original_language or "unknown",
                 transcript_blob_url="",
-                language_results=language_results,
+                language_results=final_language_results,
             )
             try:
                 await client.post(callback_url, json=payload.model_dump(by_alias=True), timeout=30)

@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using VideoHub.Api.Application.Exceptions;
@@ -6,6 +7,7 @@ using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Domain.Jobs;
 using VideoHub.Api.Domain.Media;
 using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Infrastructure.Persistence;
 
 namespace VideoHub.Api.Application.Captions;
 
@@ -20,6 +22,7 @@ public sealed class CaptionService : ICaptionService
     private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor;
     private readonly IConfiguration configuration;
     private readonly ILogger<CaptionService> logger;
+    private readonly AppDbContext dbContext;
 
     public CaptionService(
         IRepository<CaptionFile> captionFileRepository,
@@ -30,7 +33,8 @@ public sealed class CaptionService : ICaptionService
         IHttpClientFactory httpClientFactory,
         Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
-        ILogger<CaptionService> logger)
+        ILogger<CaptionService> logger,
+        AppDbContext dbContext)
     {
         this.captionFileRepository = captionFileRepository;
         this.jobRepository = jobRepository;
@@ -41,6 +45,7 @@ public sealed class CaptionService : ICaptionService
         this.httpContextAccessor = httpContextAccessor;
         this.configuration = configuration;
         this.logger = logger;
+        this.dbContext = dbContext;
     }
 
     public async Task DispatchCaptionGenerationAsync(
@@ -193,36 +198,65 @@ public sealed class CaptionService : ICaptionService
         var anyCompleted = allCaptionFiles.Any(cf => cf.Status == CaptionFileStatuses.Completed);
         var anyFailed = allCaptionFiles.Any(cf => cf.Status == CaptionFileStatuses.Failed);
 
-        if (anyCompleted)
+        if (!string.IsNullOrEmpty(transcriptBlobUrl))
         {
-            // Check if a transcript already exists for this project, language, and version
-            var allTranscripts = await transcriptRepository.ListAsync(cancellationToken);
-            var existingTranscript = allTranscripts.FirstOrDefault(t => 
-                t.ProjectId == job.ProjectId && 
-                t.Language == detectedLanguage && 
-                t.Version == 1);
+            try
+            {
+                // Check if a transcript already exists for this project, language, and version
+                var allTranscripts = await transcriptRepository.ListAsync(cancellationToken);
+                var existingTranscript = allTranscripts.FirstOrDefault(t => 
+                    t.ProjectId == job.ProjectId && 
+                    t.Language == detectedLanguage && 
+                    t.Version == 1);
 
-            if (existingTranscript != null)
-            {
-                existingTranscript.BlobUrl = transcriptBlobUrl;
-                existingTranscript.Status = "Completed";
-                transcriptRepository.Update(existingTranscript);
-            }
-            else
-            {
-                // Persist transcript metadata
-                var transcript = new Transcript
+                if (existingTranscript != null)
                 {
-                    Id = Guid.NewGuid(),
-                    ProjectId = job.ProjectId,
-                    Language = detectedLanguage,
-                    Status = "Completed",
-                    Version = 1,
-                    BlobUrl = transcriptBlobUrl
-                };
-                await transcriptRepository.AddAsync(transcript, cancellationToken);
+                    existingTranscript.BlobUrl = transcriptBlobUrl;
+                    existingTranscript.Status = "Completed";
+                    transcriptRepository.Update(existingTranscript);
+                }
+                else
+                {
+                    // Persist transcript metadata
+                    var transcript = new Transcript
+                    {
+                        Id = Guid.NewGuid(),
+                        ProjectId = job.ProjectId,
+                        Language = detectedLanguage,
+                        Status = "Completed",
+                        Version = 1,
+                        BlobUrl = transcriptBlobUrl
+                    };
+                    await transcriptRepository.AddAsync(transcript, cancellationToken);
+                }
+                await unitOfWork.SaveChangesAsync(cancellationToken);
             }
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "23505")
+            {
+                logger.LogWarning("Concurrent insert detected for transcript: ProjectId={ProjectId}, Language={Language}. Retrying as update.", job.ProjectId, detectedLanguage);
+                
+                // Detach the entity to avoid EF tracking conflicts
+                var trackedTranscript = dbContext.ChangeTracker.Entries<Transcript>().FirstOrDefault();
+                if (trackedTranscript != null)
+                {
+                    trackedTranscript.State = EntityState.Detached;
+                }
+
+                // Query database directly and update
+                var allTranscripts = await transcriptRepository.ListAsync(cancellationToken);
+                var existingTranscript = allTranscripts.FirstOrDefault(t => 
+                    t.ProjectId == job.ProjectId && 
+                    t.Language == detectedLanguage && 
+                    t.Version == 1);
+
+                if (existingTranscript != null)
+                {
+                    existingTranscript.BlobUrl = transcriptBlobUrl;
+                    existingTranscript.Status = "Completed";
+                    transcriptRepository.Update(existingTranscript);
+                    await unitOfWork.SaveChangesAsync(cancellationToken);
+                }
+            }
         }
 
         job.Status = (anyCompleted, anyFailed) switch

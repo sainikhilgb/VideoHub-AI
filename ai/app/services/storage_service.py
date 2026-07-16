@@ -37,8 +37,8 @@ async def upload_to_supabase(bucket: str, local_path: str, storage_path: str, co
             response = await client.post(url, headers=headers, content=f.read())
             response.raise_for_status()
 
-    public_url = (
-        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/public/"
+    authenticated_url = (
+        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/authenticated/"
         f"{bucket}/{storage_path}"
     )
-    return public_url
+    return authenticated_url

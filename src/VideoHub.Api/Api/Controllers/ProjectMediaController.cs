@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using VideoHub.Api.Application.BackgroundJobs;
 using VideoHub.Api.Application.Commands;
 using VideoHub.Api.Application.CurrentUser;
@@ -8,6 +9,7 @@ using VideoHub.Api.Application.Uploads;
 using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Domain.Jobs;
 using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Infrastructure.Persistence;
 
 namespace VideoHub.Api.Api.Controllers;
 
@@ -135,6 +137,7 @@ public sealed class ProjectMediaController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetProjectMediaAsync(
         [FromRoute] Guid projectId,
+        [FromServices] AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
@@ -143,8 +146,7 @@ public sealed class ProjectMediaController : ControllerBase
         if (project.UserId != currentUserService.UserId)
             return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to access this project.");
 
-        var allFiles = await mediaFileRepository.ListAsync(cancellationToken);
-        var projectFiles = allFiles
+        var projectFiles = await dbContext.MediaFiles
             .Where(mf => mf.ProjectId == projectId)
             .Select(mf => new ProjectMediaResponseDto(
                 mf.Id,
@@ -154,7 +156,7 @@ public sealed class ProjectMediaController : ControllerBase
                 mf.FileSize,
                 mf.Status,
                 mf.UploadedAt))
-            .ToList();
+            .ToListAsync(cancellationToken);
 
         return Ok(projectFiles);
     }

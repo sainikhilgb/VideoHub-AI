@@ -287,13 +287,18 @@ export interface ProjectTranscriptResponse {
   blobUrl: string | null
 }
 
-export const useProjectTranscript = (projectId: string | undefined) => {
+export const useProjectTranscript = (projectId: string | undefined, language?: string, version?: number) => {
   return useQuery<ProjectTranscriptResponse | null>({
-    queryKey: ['projectTranscript', projectId],
+    queryKey: ['projectTranscript', projectId, language, version],
     queryFn: async () => {
       if (!projectId) return null
       try {
-        const response = await apiClient.get<ProjectTranscriptResponse>(`/v1/projects/${projectId}/transcript`)
+        const params = new URLSearchParams()
+        if (language) params.append('language', language)
+        if (version) params.append('version', version.toString())
+        const response = await apiClient.get<ProjectTranscriptResponse>(
+          `/v1/projects/${projectId}/transcript?${params.toString()}`
+        )
         return response.data
       } catch (err: unknown) {
         if (axios.isAxiosError(err) && err.response?.status === 404) {

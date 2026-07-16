@@ -19,7 +19,7 @@ export const ProjectCaptionsTab: React.FC = () => {
     )
   }
 
-  const completedCaptions = captions?.filter(c => c.status.toLowerCase() === 'completed') || []
+  const completedCaptions = captions?.filter(c => c.status.toLowerCase() === 'completed' && !!c.blobUrl) || []
   const hasCaptions = completedCaptions.length > 0
 
   return (

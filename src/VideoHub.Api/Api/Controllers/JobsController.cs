@@ -53,7 +53,13 @@ public sealed class JobsController : ControllerBase
         [FromQuery] string? secret,
         CancellationToken cancellationToken)
     {
-        var expectedSecret = configuration["AiService:CallbackSecret"] ?? "VideoHubAI_Secure_Callback_Secret_2026";
+        var expectedSecret = configuration["AiService:CallbackSecret"];
+        if (string.IsNullOrEmpty(expectedSecret))
+        {
+            logger.LogError("Callback secret is not configured in the host environment.");
+            return StatusCode(StatusCodes.Status500InternalServerError, "Callback secret is not configured.");
+        }
+
         if (string.IsNullOrEmpty(secret))
         {
             if (Request.Headers.TryGetValue("X-Callback-Secret", out var headerSecret))
@@ -66,6 +72,25 @@ public sealed class JobsController : ControllerBase
         {
             logger.LogWarning("Unauthorized job callback attempt: JobId={JobId}", jobId);
             return Unauthorized("Invalid callback credentials.");
+        }
+
+        if (!string.IsNullOrEmpty(dto.TranscriptBlobUrl))
+        {
+            var configuredOrigin = configuration["BlobStorage:SupabaseUrl"];
+            if (string.IsNullOrEmpty(configuredOrigin))
+            {
+                logger.LogError("Supabase URL is not configured.");
+                return StatusCode(StatusCodes.Status500InternalServerError, "Blob storage URL is not configured.");
+            }
+
+            if (!Uri.TryCreate(configuredOrigin, UriKind.Absolute, out var originUri) ||
+                !Uri.TryCreate(dto.TranscriptBlobUrl, UriKind.Absolute, out var uri) ||
+                uri.Scheme != Uri.UriSchemeHttps ||
+                !string.Equals(originUri.Host, uri.Host, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning("Invalid or mismatched transcript blob URL: {Url}", dto.TranscriptBlobUrl);
+                return BadRequest("Invalid transcript blob URL or origin mismatch.");
+            }
         }
 
         logger.LogInformation("Job Callback Received: JobId={JobId} DetectedLanguage={Lang}", jobId, dto.DetectedLanguage);

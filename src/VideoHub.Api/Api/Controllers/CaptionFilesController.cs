@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VideoHub.Api.Application.Captions;
 using VideoHub.Api.Application.Exceptions;
@@ -7,6 +8,7 @@ using VideoHub.Api.Application.CurrentUser;
 
 namespace VideoHub.Api.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/v1/caption-files")]
 public sealed class CaptionFilesController : ControllerBase
@@ -24,6 +26,7 @@ public sealed class CaptionFilesController : ControllerBase
     /// Receives per-language status updates from the Python AI service as each caption format completes.
     /// </summary>
     [HttpPost("{captionFileId:guid}/status")]
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStatus(
