@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
-from app.models.schemas import ProcessRequest
+from app.models.schemas import ProcessRequest, CombineRequest
 from app.services import transcription_worker
 from app.core.logging import log_context
 
@@ -40,4 +40,28 @@ async def process(request: ProcessRequest, background_tasks: BackgroundTasks):
     return JSONResponse(
         status_code=202,
         content={"message": "Processing started", "jobId": request.job_id},
+    )
+
+
+@router.post("/process-combine", status_code=202)
+async def process_combine(request: CombineRequest, background_tasks: BackgroundTasks):
+    """
+    Accepts a media combining (muxing) job from the .NET backend.
+    Returns 202 Accepted immediately and processes in the background.
+    """
+    ctx = log_context.get()
+    ctx = ctx.copy() if ctx is not None else {}
+    ctx.update({
+        "CombinedMediaId": request.combined_media_id,
+    })
+    log_context.set(ctx)
+
+    logger.info("Process-combine request received: combined_media_id=%s mux_type=%s",
+                request.combined_media_id, request.mux_type)
+
+    background_tasks.add_task(transcription_worker.run_combine, request)
+
+    return JSONResponse(
+        status_code=202,
+        content={"message": "Combining processing started", "combinedMediaId": request.combined_media_id},
     )

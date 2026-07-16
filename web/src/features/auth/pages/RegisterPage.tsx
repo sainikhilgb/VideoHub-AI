@@ -161,6 +161,7 @@ export const RegisterPage: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
+                  autoComplete="new-password"
                   onChange={(e) => {
                     setPassword(e.target.value)
                     if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }))
@@ -189,6 +190,7 @@ export const RegisterPage: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={confirmPassword}
+                autoComplete="new-password"
                 onChange={(e) => {
                   setConfirmPassword(e.target.value)
                   if (errors.confirmPassword) setErrors((prev) => ({ ...prev, confirmPassword: undefined }))

@@ -20,9 +20,9 @@ public static class ApplicationBuilderExtensions
         app.UseHttpsRedirection();
 
         var storageOptions = app.Services.GetRequiredService<IOptions<BlobStorageOptions>>().Value;
-        var rootPath = string.IsNullOrWhiteSpace(storageOptions.LocalPath)
+        var rootPath = Path.GetFullPath(string.IsNullOrWhiteSpace(storageOptions.LocalPath)
             ? Path.Combine(AppContext.BaseDirectory, "blobs")
-            : storageOptions.LocalPath;
+            : storageOptions.LocalPath);
         Directory.CreateDirectory(rootPath);
 
         app.UseStaticFiles(new StaticFileOptions

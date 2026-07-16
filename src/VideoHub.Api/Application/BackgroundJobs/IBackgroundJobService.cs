@@ -1,3 +1,5 @@
+using Hangfire;
+
 namespace VideoHub.Api.Application.BackgroundJobs;
 
 public interface IBackgroundJobService
@@ -17,4 +19,9 @@ public interface IBackgroundJobService
     Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, string? correlationId = null, CancellationToken cancellationToken = default);
 
     Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, CancellationToken cancellationToken);
+
+    string QueueCombinedMediaJob(Guid combinedMediaId);
+
+    [AutomaticRetry(Attempts = 0)]
+    Task ExecuteCombinedMediaJobAsync(Guid combinedMediaId, CancellationToken cancellationToken = default);
 }
