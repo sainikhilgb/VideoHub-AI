@@ -21,6 +21,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<CombinedMedia> CombinedMediaFiles => Set<CombinedMedia>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -150,6 +151,25 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(rt => rt.User)
                 .WithMany()
                 .HasForeignKey(rt => rt.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CombinedMedia>(entity =>
+        {
+            entity.Property(cm => cm.MuxType)
+                .HasMaxLength(50);
+
+            entity.Property(cm => cm.Status)
+                .HasMaxLength(50);
+
+            entity.HasOne(cm => cm.Project)
+                .WithMany()
+                .HasForeignKey(cm => cm.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(cm => cm.MediaFile)
+                .WithMany()
+                .HasForeignKey(cm => cm.MediaFileId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

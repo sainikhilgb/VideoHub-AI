@@ -25,7 +25,7 @@ builder.Services.AddCors(options =>
     {
         if (builder.Environment.IsDevelopment())
         {
-            policy.WithOrigins("http://localhost:5173")
+            policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();
@@ -34,7 +34,7 @@ builder.Services.AddCors(options =>
         {
             var allowedOrigins = builder.Configuration.GetValue<string>("Cors:AllowedOrigins")
                 ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                ?? new[] { "http://localhost:5173" };
+                ?? new[] { "http://localhost:5173", "http://localhost:3000" };
 
             policy.WithOrigins(allowedOrigins)
                   .AllowAnyMethod()

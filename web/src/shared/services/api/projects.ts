@@ -312,3 +312,57 @@ export const useProjectTranscript = (projectId: string | undefined, language?: s
     enabled: !!projectId,
   })
 }
+
+// 13. Combined Subtitle Video Muxing (Soft-Mux & Hard-Burn)
+export interface CombinedMediaResponse {
+  id: string
+  projectId: string
+  mediaFileId: string
+  language: string
+  muxType: string
+  status: string
+  url: string | null
+  error: string | null
+  createdAt: string
+}
+
+export interface CombineMediaParams {
+  projectId: string
+  mediaFileId: string
+  captionFileId: string
+  muxType: string
+}
+
+export const useProjectCombinedMedia = (projectId: string | undefined) => {
+  return useQuery<CombinedMediaResponse[]>({
+    queryKey: ['projectCombinedMedia', projectId],
+    queryFn: async () => {
+      if (!projectId) return []
+      const response = await apiClient.get<CombinedMediaResponse[]>(`/v1/projects/${projectId}/combined-media`)
+      return response.data
+    },
+    enabled: !!projectId,
+    refetchInterval: (query) => {
+      const data = query.state.data as CombinedMediaResponse[] | undefined
+      const hasProcessing = data?.some(cm => cm.status === 'Queued' || cm.status === 'Processing')
+      return hasProcessing ? 3000 : false
+    }
+  })
+}
+
+export const useCombineMedia = () => {
+  const queryClient = useQueryClient()
+  return useMutation<CombinedMediaResponse, Error, CombineMediaParams>({
+    mutationFn: async ({ projectId, mediaFileId, captionFileId, muxType }) => {
+      const response = await apiClient.post<CombinedMediaResponse>(`/v1/projects/${projectId}/combined-media/combine`, {
+        mediaFileId,
+        captionFileId,
+        muxType
+      })
+      return response.data
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['projectCombinedMedia', variables.projectId] })
+    }
+  })
+}

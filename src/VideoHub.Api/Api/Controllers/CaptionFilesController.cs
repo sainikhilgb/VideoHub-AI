@@ -5,6 +5,9 @@ using VideoHub.Api.Application.Exceptions;
 using VideoHub.Api.Infrastructure.Abstractions;
 using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Application.CurrentUser;
+using System.Threading;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace VideoHub.Api.Api.Controllers;
 
@@ -57,6 +60,7 @@ public sealed class CaptionFilesController : ControllerBase
         Guid projectId,
         [FromServices] IRepository<Project> projectRepository,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IBlobStorage blobStorage,
         CancellationToken cancellationToken)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
@@ -66,6 +70,28 @@ public sealed class CaptionFilesController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to access this project.");
 
         var captions = await captionService.GetCaptionsByProjectIdAsync(projectId, cancellationToken);
+
+        using var semaphore = new SemaphoreSlim(4);
+        var tasks = captions.Select(async c =>
+        {
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                var url = c.BlobUrl;
+                if (!string.IsNullOrEmpty(url) && url.Contains("/storage/v1/object/"))
+                {
+                    url = await blobStorage.GetSignedUrlAsync(url, TimeSpan.FromHours(1), cancellationToken);
+                }
+                c.BlobUrl = url;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+
         return Ok(captions);
     }
 }

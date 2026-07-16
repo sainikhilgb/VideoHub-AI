@@ -57,6 +57,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       >
         {vttUrl && (
           <track
+            key={vttUrl}
             kind="subtitles"
             src={vttUrl}
             srcLang={vttLanguage}

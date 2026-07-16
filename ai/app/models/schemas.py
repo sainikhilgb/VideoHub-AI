@@ -68,3 +68,15 @@ class ProcessCallbackPayload(CamelModel):
     detected_language: str
     transcript_blob_url: str
     language_results: list[LanguageResult]
+
+
+class CombineRequest(CamelModel):
+    combined_media_id: str
+    video_url: str
+    subtitle_url: str
+    mux_type: str
+    language: str
+    bucket: str
+    output_folder: str
+    output_name: str
+    callback_url: str

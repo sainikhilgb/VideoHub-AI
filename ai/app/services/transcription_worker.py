@@ -13,6 +13,7 @@ from app.models.schemas import (
     ProcessCallbackPayload,
     ProcessRequest,
     SegmentResult,
+    CombineRequest,
 )
 from app.services import caption_service, storage_service, transcription_service
 from app.core.logging import log_operation, log_context
@@ -232,5 +233,111 @@ async def run(request: ProcessRequest) -> None:
                 await client.post(callback_url, json=payload.model_dump(by_alias=True), timeout=30)
             except Exception as cb_exc:
                 logger.error("Failed to send fallback final callback: %s", cb_exc)
+    finally:
+        log_context.reset(token)
+
+
+async def run_combine(request: CombineRequest) -> None:
+    """
+    Background worker for combining subtitle tracks with video using ffmpeg:
+    1. Downloads both video and subtitle files via HTTP GET.
+    2. Runs FFmpeg:
+       - Soft-Mux: embeds the subtitle file as a soft track stream.
+       - Hard-Burn: draws the subtitle text directly on the video frames.
+    3. Uploads the processed video back to the Supabase storage bucket.
+    4. Posts a status callback to the .NET backend.
+    """
+    import subprocess
+    import uuid
+    dotnet_base = settings.dotnet_api_base_url
+    callback_url = f"{dotnet_base.rstrip('/')}{request.callback_url}"
+
+    # Initialize log context
+    token = log_context.set({
+        "CorrelationId": str(uuid.uuid4()),
+        "CombinedMediaId": request.combined_media_id,
+        "ServiceName": "VideoHub.Ai"
+    })
+
+    try:
+        with log_operation("combine_worker_job"):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                video_ext = os.path.splitext(request.output_name)[-1] or ".mp4"
+                video_input_path = os.path.join(tmpdir, f"video_input{video_ext}")
+                subtitle_input_path = os.path.join(tmpdir, "subtitle_input.srt")
+                video_output_path = os.path.join(tmpdir, f"video_output{video_ext}")
+
+                # Download video file
+                async with httpx.AsyncClient(timeout=300) as client:
+                    async with client.stream("GET", request.video_url) as r:
+                        r.raise_for_status()
+                        with open(video_input_path, "wb") as f:
+                            async for chunk in r.aiter_bytes(chunk_size=8192):
+                                f.write(chunk)
+
+                # Download subtitle file (SRT)
+                async with httpx.AsyncClient(timeout=60) as client:
+                    async with client.stream("GET", request.subtitle_url) as r:
+                        r.raise_for_status()
+                        with open(subtitle_input_path, "wb") as f:
+                            async for chunk in r.aiter_bytes(chunk_size=8192):
+                                f.write(chunk)
+
+                # Run FFmpeg soft-muxing (combines video stream with subtitle text stream)
+                logger.info("Executing soft-mux subtitles using FFmpeg")
+                lang_code = request.language.lower()
+                lang_map = {"en": "eng", "es": "spa", "fr": "fre", "de": "ger", "it": "ita"}
+                ffmpeg_lang = lang_map.get(lang_code, lang_code)
+
+                cmd = [
+                    "ffmpeg", "-y", "-i", video_input_path,
+                    "-i", subtitle_input_path,
+                    "-map", "0:v",
+                    "-map", "0:a?",
+                    "-map", "1:s",
+                    "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-c:s", "mov_text",
+                    "-metadata:s:s:0", f"language={ffmpeg_lang}",
+                    "-metadata:s:s:0", f"title={request.language.upper()} Subtitles",
+                    video_output_path
+                ]
+
+                # Execute FFmpeg synchronously inside a thread pool to avoid blocking the asyncio loop
+                def run_ffmpeg():
+                    try:
+                        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                        logger.info("FFmpeg combine completed successfully: stdout=%s", res.stdout)
+                    except subprocess.CalledProcessError as err:
+                        logger.error("FFmpeg combine failed with exit code %s: stdout=%s stderr=%s", err.returncode, err.stdout, err.stderr)
+                        err_msg = err.stderr or ""
+                        if "No such filter" in err_msg or "No option name near" in err_msg:
+                            err_msg = "FFmpeg is missing the 'subtitles' filter. Hard-burning requires FFmpeg to be compiled with libass support. Please run 'brew reinstall ffmpeg' in your terminal, or use the Soft-Muxed option instead."
+                        raise Exception(err_msg)
+
+                await asyncio.to_thread(run_ffmpeg)
+
+                # Upload to Supabase
+                storage_path = f"{request.output_folder.rstrip('/')}/{request.output_name}"
+                logger.info("Uploading combined video output to storage: %s", storage_path)
+                blob_url = await storage_service.upload_to_supabase(
+                    request.bucket, video_output_path, storage_path, "video/mp4"
+                )
+
+                # Send success status callback to .NET
+                async with httpx.AsyncClient() as client:
+                    await _post_status(client, callback_url, {
+                        "status": "Completed",
+                        "blobUrl": blob_url
+                    })
+
+    except Exception as exc:
+        logger.error("Combined media processing failed: CombinedMediaId=%s error=%s", request.combined_media_id, exc, exc_info=True)
+        async with httpx.AsyncClient() as client:
+            await _post_status(client, callback_url, {
+                "status": "Failed",
+                "error": str(exc)
+            })
     finally:
         log_context.reset(token)

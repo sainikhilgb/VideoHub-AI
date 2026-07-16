@@ -17,4 +17,8 @@ public interface IBackgroundJobService
     Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, string? correlationId = null, CancellationToken cancellationToken = default);
 
     Task ExecuteMediaProcessingAsync(Guid jobId, Guid mediaFileId, CancellationToken cancellationToken);
+
+    string QueueCombinedMediaJob(Guid combinedMediaId);
+
+    Task ExecuteCombinedMediaJobAsync(Guid combinedMediaId, CancellationToken cancellationToken = default);
 }
