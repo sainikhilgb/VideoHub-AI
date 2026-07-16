@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using VideoHub.Api.Infrastructure.Abstractions;
 using VideoHub.Api.Infrastructure.Options;
 using System.IO;
+using System.Linq;
 
 namespace VideoHub.Api.Infrastructure.Storage;
 
@@ -90,12 +91,16 @@ public sealed class LocalBlobStorage : IBlobStorage
         var relativePath = Path.GetRelativePath(rootPath, fullPath);
         var safePath = relativePath.Replace('\\', '/').TrimStart('/');
 
+        var segments = safePath.Split('/', System.StringSplitOptions.RemoveEmptyEntries)
+                               .Select(System.Uri.EscapeDataString);
+        var encodedPath = System.String.Join('/', segments);
+
         var origin = configuration["BlobStorage:PublicOrigin"] ?? configuration["Api:BaseUrl"];
         if (string.IsNullOrEmpty(origin))
         {
-            return Task.FromResult<string?>($"/blobs/{safePath}");
+            return Task.FromResult<string?>($"/blobs/{encodedPath}");
         }
 
-        return Task.FromResult<string?>($"{origin.TrimEnd('/')}/blobs/{safePath}");
+        return Task.FromResult<string?>($"{origin.TrimEnd('/')}/blobs/{encodedPath}");
     }
 }
