@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using VideoHub.Api.Application.Captions;
 using VideoHub.Api.Application.Exceptions;
+using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Domain.Entities;
+using VideoHub.Api.Application.CurrentUser;
 
 namespace VideoHub.Api.Api.Controllers;
 
@@ -38,5 +41,28 @@ public sealed class CaptionFilesController : ControllerBase
             cancellationToken);
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Retrieves all caption files associated with the specified project.
+    /// </summary>
+    [HttpGet("project/{projectId:guid}")]
+    [ProducesResponseType(typeof(IEnumerable<ProjectCaptionResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetCaptionFilesByProject(
+        Guid projectId,
+        [FromServices] IRepository<Project> projectRepository,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
+        if (project is null) return NotFound($"Project '{projectId}' was not found.");
+
+        if (project.UserId != currentUserService.UserId)
+            return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to access this project.");
+
+        var captions = await captionService.GetCaptionsByProjectIdAsync(projectId, cancellationToken);
+        return Ok(captions);
     }
 }

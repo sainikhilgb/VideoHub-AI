@@ -1,21 +1,6 @@
 namespace VideoHub.Api.Application.Captions;
 
-public sealed class TranscriptSegmentDto
-{
-    public double Start { get; set; }
-    public double End { get; set; }
-    public string Text { get; set; } = string.Empty;
-    public double? Confidence { get; set; }
-    public IReadOnlyList<WordDto> Words { get; set; } = [];
-}
 
-public sealed class WordDto
-{
-    public string Text { get; set; } = string.Empty;
-    public double Start { get; set; }
-    public double End { get; set; }
-    public double? Confidence { get; set; }
-}
 
 /// <summary>Sent from .NET → Python to initiate processing.</summary>
 public sealed class AiProcessRequest
@@ -52,7 +37,7 @@ public sealed class CaptionStatusCallbackDto
 public sealed class AiProcessCallbackDto
 {
     public string DetectedLanguage { get; set; } = string.Empty;
-    public IReadOnlyList<TranscriptSegmentDto> Segments { get; set; } = [];
+    public string TranscriptBlobUrl { get; set; } = string.Empty;
     public IReadOnlyList<LanguageResult> LanguageResults { get; set; } = [];
 }
 
@@ -61,4 +46,14 @@ public sealed class LanguageResult
     public string LanguageCode { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string? Error { get; set; }
+}
+
+public sealed class ProjectCaptionResponseDto
+{
+    public Guid Id { get; set; }
+    public Guid? JobId { get; set; }
+    public string Format { get; set; } = string.Empty;
+    public string Language { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? BlobUrl { get; set; }
 }

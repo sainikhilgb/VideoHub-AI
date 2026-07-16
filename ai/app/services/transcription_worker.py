@@ -143,12 +143,37 @@ async def run(request: ProcessRequest) -> None:
                         ]
                         language_results: list[LanguageResult] = await asyncio.gather(*tasks)
 
-                    # Step 5: Final callback to .NET
+                    # Step 5: Compile segments to transcript.json and upload
+                    import json
+                    transcript_data = {
+                        "detectedLanguage": detected_language,
+                        "segments": [seg.model_dump(by_alias=True) for seg in segments]
+                    }
+
+                    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as tmp:
+                        json.dump(transcript_data, tmp, ensure_ascii=False, indent=2)
+                        tmp_path = tmp.name
+
+                    try:
+                        path_parts = request.storage_path.strip("/").split("/")
+                        if len(path_parts) < 2:
+                            raise ValueError(f"Invalid media storage path format: {request.storage_path}")
+
+                        project_prefix = f"{path_parts[0]}/{path_parts[1]}"
+                        transcript_storage_path = f"{project_prefix}/transcripts/transcript.json"
+
+                        transcript_blob_url = await storage_service.upload_to_supabase(
+                            request.bucket, tmp_path, transcript_storage_path, "application/json"
+                        )
+                    finally:
+                        os.unlink(tmp_path)
+
+                    # Step 6: Final callback to .NET
                     with log_operation("final_callback_dotnet"):
                         callback_url = f"{dotnet_base.rstrip('/')}{request.callback_url}"
                         payload = ProcessCallbackPayload(
                             detected_language=detected_language,
-                            segments=segments,
+                            transcript_blob_url=transcript_blob_url,
                             language_results=language_results,
                         )
 
@@ -183,7 +208,7 @@ async def run(request: ProcessRequest) -> None:
             callback_url = f"{dotnet_base.rstrip('/')}{request.callback_url}"
             payload = ProcessCallbackPayload(
                 detected_language=request.original_language or "unknown",
-                segments=[],
+                transcript_blob_url="",
                 language_results=language_results,
             )
             try:

@@ -124,4 +124,38 @@ public sealed class ProjectMediaController : ControllerBase
 
         return Accepted(new { JobId = processingJob.Id, HangfireJobId = hangfireJobId });
     }
+
+    /// <summary>
+    /// Retrieves all media files associated with the specified project.
+    /// </summary>
+    [HttpGet]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(IEnumerable<ProjectMediaResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetProjectMediaAsync(
+        [FromRoute] Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
+        if (project is null) return NotFound($"Project '{projectId}' was not found.");
+
+        if (project.UserId != currentUserService.UserId)
+            return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to access this project.");
+
+        var allFiles = await mediaFileRepository.ListAsync(cancellationToken);
+        var projectFiles = allFiles
+            .Where(mf => mf.ProjectId == projectId)
+            .Select(mf => new ProjectMediaResponseDto(
+                mf.Id,
+                mf.ProjectId,
+                mf.OriginalFileName,
+                mf.MimeType,
+                mf.FileSize,
+                mf.Status,
+                mf.UploadedAt))
+            .ToList();
+
+        return Ok(projectFiles);
+    }
 }

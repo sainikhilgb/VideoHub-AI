@@ -35,6 +35,13 @@ public interface ICaptionService
     Task FinalizeJobAsync(
         Guid jobId,
         string detectedLanguage,
-        IReadOnlyList<TranscriptSegmentDto> segments,
+        string transcriptBlobUrl,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves all caption files associated with the specified project.
+    /// </summary>
+    Task<IEnumerable<ProjectCaptionResponseDto>> GetCaptionsByProjectIdAsync(
+        Guid projectId,
         CancellationToken cancellationToken = default);
 }

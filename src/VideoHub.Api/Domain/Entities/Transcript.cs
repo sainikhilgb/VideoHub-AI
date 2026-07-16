@@ -21,8 +21,10 @@ public sealed class Transcript
     [MaxLength(50)]
     public string Status { get; set; } = "Queued";
 
+    [MaxLength(2048)]
+    public string? BlobUrl { get; set; }
+
     public Project? Project { get; set; }
-    public ICollection<TranscriptSegment> Segments { get; set; } = new List<TranscriptSegment>();
     public ICollection<Speaker> Speakers { get; set; } = new List<Speaker>();
     public ICollection<Translation> Translations { get; set; } = new List<Translation>();
 }

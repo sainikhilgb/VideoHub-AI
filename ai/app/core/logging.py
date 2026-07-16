@@ -4,10 +4,10 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from contextvars import ContextVar
-from typing import Any, Generator
+from typing import Any, Generator, Optional
 
 # Context variables for structured logging
-log_context: ContextVar[dict[str, Any] | None] = ContextVar("log_context", default=None)
+log_context: ContextVar[Optional[dict[str, Any]]] = ContextVar("log_context", default=None)
 
 class StructuredFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:

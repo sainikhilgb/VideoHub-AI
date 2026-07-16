@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Domain.Entities;
+using VideoHub.Api.Application.CurrentUser;
+using VideoHub.Api.Application.DTOs;
 
 namespace VideoHub.Api.Api.Controllers;
 
@@ -58,5 +62,38 @@ public sealed class ProjectController : ControllerBase
     {
         await _projectService.DeleteProjectAsync(id, cancellationToken);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Retrieves the speech transcript associated with the specified project.
+    /// </summary>
+    [HttpGet("{projectId:guid}/transcript")]
+    [ProducesResponseType(typeof(ProjectTranscriptResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetProjectTranscript(
+        Guid projectId,
+        [FromServices] IRepository<Project> projectRepository,
+        [FromServices] IRepository<Transcript> transcriptRepository,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
+        if (project is null) return NotFound($"Project '{projectId}' was not found.");
+
+        if (project.UserId != currentUserService.UserId)
+            return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to access this project.");
+
+        var allTranscripts = await transcriptRepository.ListAsync(cancellationToken);
+        var transcript = allTranscripts.FirstOrDefault(t => t.ProjectId == projectId);
+
+        if (transcript is null)
+            return NotFound($"No transcript found for project '{projectId}'.");
+
+        return Ok(new ProjectTranscriptResponseDto(
+            transcript.Id,
+            transcript.Language,
+            transcript.Status,
+            transcript.BlobUrl));
     }
 }

@@ -14,8 +14,6 @@ public sealed class CaptionService : ICaptionService
     private readonly IRepository<CaptionFile> captionFileRepository;
     private readonly IRepository<Job> jobRepository;
     private readonly IRepository<Transcript> transcriptRepository;
-    private readonly IRepository<TranscriptSegment> segmentRepository;
-    private readonly IRepository<Word> wordRepository;
     private readonly IBlobStorage blobStorage;
     private readonly IUnitOfWork unitOfWork;
     private readonly IHttpClientFactory httpClientFactory;
@@ -27,8 +25,6 @@ public sealed class CaptionService : ICaptionService
         IRepository<CaptionFile> captionFileRepository,
         IRepository<Job> jobRepository,
         IRepository<Transcript> transcriptRepository,
-        IRepository<TranscriptSegment> segmentRepository,
-        IRepository<Word> wordRepository,
         IBlobStorage blobStorage,
         IUnitOfWork unitOfWork,
         IHttpClientFactory httpClientFactory,
@@ -39,8 +35,6 @@ public sealed class CaptionService : ICaptionService
         this.captionFileRepository = captionFileRepository;
         this.jobRepository = jobRepository;
         this.transcriptRepository = transcriptRepository;
-        this.segmentRepository = segmentRepository;
-        this.wordRepository = wordRepository;
         this.blobStorage = blobStorage;
         this.unitOfWork = unitOfWork;
         this.httpClientFactory = httpClientFactory;
@@ -183,7 +177,7 @@ public sealed class CaptionService : ICaptionService
     public async Task FinalizeJobAsync(
         Guid jobId,
         string detectedLanguage,
-        IReadOnlyList<TranscriptSegmentDto> segments,
+        string transcriptBlobUrl,
         CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Job Finalization Started: JobId={JobId}", jobId);
@@ -201,45 +195,34 @@ public sealed class CaptionService : ICaptionService
 
         if (anyCompleted)
         {
-            // Persist transcript
-            var transcript = new Transcript
-            {
-                Id = Guid.NewGuid(),
-                ProjectId = job.ProjectId,
-                Language = detectedLanguage,
-                Status = "Completed",
-                Version = 1
-            };
-            await transcriptRepository.AddAsync(transcript, cancellationToken);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            // Check if a transcript already exists for this project, language, and version
+            var allTranscripts = await transcriptRepository.ListAsync(cancellationToken);
+            var existingTranscript = allTranscripts.FirstOrDefault(t => 
+                t.ProjectId == job.ProjectId && 
+                t.Language == detectedLanguage && 
+                t.Version == 1);
 
-            foreach (var seg in segments)
+            if (existingTranscript != null)
             {
-                var segment = new TranscriptSegment
+                existingTranscript.BlobUrl = transcriptBlobUrl;
+                existingTranscript.Status = "Completed";
+                transcriptRepository.Update(existingTranscript);
+            }
+            else
+            {
+                // Persist transcript metadata
+                var transcript = new Transcript
                 {
                     Id = Guid.NewGuid(),
-                    TranscriptId = transcript.Id,
-                    StartTime = seg.Start,
-                    EndTime = seg.End,
-                    Text = seg.Text,
-                    Confidence = seg.Confidence
+                    ProjectId = job.ProjectId,
+                    Language = detectedLanguage,
+                    Status = "Completed",
+                    Version = 1,
+                    BlobUrl = transcriptBlobUrl
                 };
-                await segmentRepository.AddAsync(segment, cancellationToken);
-                await unitOfWork.SaveChangesAsync(cancellationToken);
-
-                foreach (var word in seg.Words)
-                {
-                    await wordRepository.AddAsync(new Word
-                    {
-                        Id = Guid.NewGuid(),
-                        SegmentId = segment.Id,
-                        Text = word.Text,
-                        Start = word.Start,
-                        End = word.End,
-                        Confidence = word.Confidence
-                    }, cancellationToken);
-                }
+                await transcriptRepository.AddAsync(transcript, cancellationToken);
             }
+            await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
         job.Status = (anyCompleted, anyFailed) switch
@@ -254,5 +237,29 @@ public sealed class CaptionService : ICaptionService
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Job Finalization Completed: JobId={JobId} FinalStatus={Status}", jobId, job.Status);
+    }
+
+    public async Task<IEnumerable<ProjectCaptionResponseDto>> GetCaptionsByProjectIdAsync(
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var allJobs = await jobRepository.ListAsync(cancellationToken);
+        var projectJobIds = allJobs.Where(j => j.ProjectId == projectId).Select(j => j.Id).ToHashSet();
+
+        var allCaptionFiles = await captionFileRepository.ListAsync(cancellationToken);
+        var projectCaptions = allCaptionFiles
+            .Where(cf => cf.JobId.HasValue && projectJobIds.Contains(cf.JobId.Value))
+            .Select(cf => new ProjectCaptionResponseDto
+            {
+                Id = cf.Id,
+                JobId = cf.JobId,
+                Format = cf.Format,
+                Language = cf.Language,
+                Status = cf.Status,
+                BlobUrl = cf.BlobUrl
+            })
+            .ToList();
+
+        return projectCaptions;
     }
 }

@@ -121,6 +121,11 @@ export const useUploadMedia = () => {
       const response = await apiClient.post<UploadMediaResponse>(
         `/v1/projects/${projectId}/media`,
         formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        },
       )
       return response.data
     },
@@ -249,5 +254,54 @@ export const useUpdateProject = () => {
       queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
+  })
+}
+
+// 11. Retrieve project caption files list
+export interface ProjectCaptionResponse {
+  id: string
+  jobId: string | null
+  format: string
+  language: string
+  status: string
+  blobUrl: string | null
+}
+
+export const useProjectCaptions = (projectId: string | undefined) => {
+  return useQuery<ProjectCaptionResponse[]>({
+    queryKey: ['projectCaptions', projectId],
+    queryFn: async () => {
+      if (!projectId) return []
+      const response = await apiClient.get<ProjectCaptionResponse[]>(`/v1/caption-files/project/${projectId}`)
+      return response.data
+    },
+    enabled: !!projectId,
+  })
+}
+
+// 12. Retrieve project transcript metadata
+export interface ProjectTranscriptResponse {
+  id: string
+  language: string
+  status: string
+  blobUrl: string | null
+}
+
+export const useProjectTranscript = (projectId: string | undefined) => {
+  return useQuery<ProjectTranscriptResponse | null>({
+    queryKey: ['projectTranscript', projectId],
+    queryFn: async () => {
+      if (!projectId) return null
+      try {
+        const response = await apiClient.get<ProjectTranscriptResponse>(`/v1/projects/${projectId}/transcript`)
+        return response.data
+      } catch (err: unknown) {
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          return null
+        }
+        throw err
+      }
+    },
+    enabled: !!projectId,
   })
 }

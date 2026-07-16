@@ -70,7 +70,7 @@ public sealed class JobsController : ControllerBase
 
         logger.LogInformation("Job Callback Received: JobId={JobId} DetectedLanguage={Lang}", jobId, dto.DetectedLanguage);
 
-        await captionService.FinalizeJobAsync(jobId, dto.DetectedLanguage, dto.Segments, cancellationToken);
+        await captionService.FinalizeJobAsync(jobId, dto.DetectedLanguage, dto.TranscriptBlobUrl, cancellationToken);
 
         return NoContent();
     }
