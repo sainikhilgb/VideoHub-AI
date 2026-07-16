@@ -88,6 +88,7 @@ public sealed class ProjectController : ControllerBase
         [FromServices] ICurrentUserService currentUserService,
         [FromServices] IConfiguration configuration,
         [FromServices] ILogger<ProjectController> logger,
+        [FromServices] IHttpClientFactory httpClientFactory,
         CancellationToken cancellationToken)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
@@ -107,20 +108,33 @@ public sealed class ProjectController : ControllerBase
             var responseUrl = transcript.BlobUrl;
             if (!string.IsNullOrEmpty(responseUrl) && responseUrl.Contains("/storage/v1/object/authenticated/"))
             {
-                responseUrl = await GenerateSignedUrlAsync(responseUrl, configuration, logger, cancellationToken);
+                responseUrl = await GenerateSignedUrlAsync(responseUrl, configuration, logger, httpClientFactory, cancellationToken);
+                if (string.IsNullOrEmpty(responseUrl))
+                {
+                    return StatusCode(StatusCodes.Status502BadGateway, "Unable to access the private storage asset.");
+                }
             }
 
             return Ok(new ProjectTranscriptResponseDto(
                 transcript.Id,
                 transcript.Language,
                 transcript.Status,
-                responseUrl));
+                responseUrl,
+                transcript.Version));
         }
         else
         {
-            var transcripts = await dbContext.Transcripts
-                .Where(t => t.ProjectId == projectId)
-                .ToListAsync(cancellationToken);
+            var query = dbContext.Transcripts.Where(t => t.ProjectId == projectId);
+            if (!string.IsNullOrEmpty(language))
+            {
+                query = query.Where(t => t.Language == language);
+            }
+            if (version.HasValue)
+            {
+                query = query.Where(t => t.Version == version.Value);
+            }
+
+            var transcripts = await query.ToListAsync(cancellationToken);
 
             var dtos = new List<ProjectTranscriptResponseDto>();
             foreach (var t in transcripts)
@@ -128,19 +142,24 @@ public sealed class ProjectController : ControllerBase
                 var responseUrl = t.BlobUrl;
                 if (!string.IsNullOrEmpty(responseUrl) && responseUrl.Contains("/storage/v1/object/authenticated/"))
                 {
-                    responseUrl = await GenerateSignedUrlAsync(responseUrl, configuration, logger, cancellationToken);
+                    responseUrl = await GenerateSignedUrlAsync(responseUrl, configuration, logger, httpClientFactory, cancellationToken);
+                    if (string.IsNullOrEmpty(responseUrl))
+                    {
+                        return StatusCode(StatusCodes.Status502BadGateway, "Unable to access one or more private storage assets.");
+                    }
                 }
-                dtos.Add(new ProjectTranscriptResponseDto(t.Id, t.Language, t.Status, responseUrl));
+                dtos.Add(new ProjectTranscriptResponseDto(t.Id, t.Language, t.Status, responseUrl, t.Version));
             }
 
             return Ok(dtos);
         }
     }
 
-    private async Task<string> GenerateSignedUrlAsync(
+    private async Task<string?> GenerateSignedUrlAsync(
         string privateUrl,
         IConfiguration configuration,
         ILogger<ProjectController> logger,
+        IHttpClientFactory httpClientFactory,
         CancellationToken cancellationToken)
     {
         try
@@ -164,10 +183,10 @@ public sealed class ProjectController : ControllerBase
                     if (string.IsNullOrEmpty(supabaseUrl) || string.IsNullOrEmpty(supabaseKey))
                     {
                         logger.LogWarning("Supabase credentials are not configured in the host environment.");
-                        return privateUrl;
+                        return null;
                     }
 
-                    using var client = new HttpClient();
+                    using var client = httpClientFactory.CreateClient();
                     client.BaseAddress = new Uri(supabaseUrl.TrimEnd('/') + "/");
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", supabaseKey);
                     client.DefaultRequestHeaders.Add("apikey", supabaseKey);
@@ -203,7 +222,7 @@ public sealed class ProjectController : ControllerBase
             logger.LogWarning(ex, "Failed to generate signed URL for {Url}", privateUrl);
         }
 
-        return privateUrl;
+        return null;
     }
 
     private sealed class SupabaseSignedUrlResponse

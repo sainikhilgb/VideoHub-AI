@@ -285,6 +285,7 @@ export interface ProjectTranscriptResponse {
   language: string
   status: string
   blobUrl: string | null
+  version: number
 }
 
 export const useProjectTranscript = (projectId: string | undefined, language?: string, version?: number) => {

@@ -6,4 +6,5 @@ public sealed record ProjectTranscriptResponseDto(
     Guid Id,
     string Language,
     string Status,
-    string? BlobUrl);
+    string? BlobUrl,
+    int Version);

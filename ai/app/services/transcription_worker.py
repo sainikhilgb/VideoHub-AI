@@ -100,6 +100,7 @@ async def run(request: ProcessRequest) -> None:
     dotnet_base = settings.dotnet_api_base_url
     completed_languages = set()
     language_results = []
+    transcript_blob_url = ""
     
     # Initialize background task log context using incoming request identifiers
     token = log_context.set({
@@ -220,11 +221,11 @@ async def run(request: ProcessRequest) -> None:
                     error=str(exc)
                 ))
             
-            # Send the final callback with empty segments and failures so the job state settles correctly
+            # Send the final callback with the successfully generated transcript URL (if any)
             callback_url = f"{dotnet_base.rstrip('/')}{request.callback_url}"
             payload = ProcessCallbackPayload(
                 detected_language=request.original_language or "unknown",
-                transcript_blob_url="",
+                transcript_blob_url=transcript_blob_url,
                 language_results=final_language_results,
             )
             try:

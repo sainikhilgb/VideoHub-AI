@@ -91,6 +91,33 @@ public sealed class JobsController : ControllerBase
                 logger.LogWarning("Invalid or mismatched transcript blob URL: {Url}", dto.TranscriptBlobUrl);
                 return BadRequest("Invalid transcript blob URL or origin mismatch.");
             }
+
+            var path = uri.AbsolutePath;
+            var prefix = "/storage/v1/object/authenticated/";
+            var publicPrefix = "/storage/v1/object/public/";
+            var actualPrefix = path.Contains(prefix) ? prefix : (path.Contains(publicPrefix) ? publicPrefix : null);
+
+            if (actualPrefix == null)
+            {
+                logger.LogWarning("Invalid storage URL structure: {Url}", dto.TranscriptBlobUrl);
+                return BadRequest("Invalid transcript blob URL structure.");
+            }
+
+            var relativePath = path.Substring(path.IndexOf(actualPrefix) + actualPrefix.Length);
+            var parts = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1)
+            {
+                logger.LogWarning("Missing bucket segment in URL: {Url}", dto.TranscriptBlobUrl);
+                return BadRequest("Invalid transcript blob URL bucket.");
+            }
+
+            var bucket = parts[0];
+            var configuredBucket = configuration["BlobStorage:BucketName"] ?? "media";
+            if (!string.Equals(bucket, configuredBucket, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning("Bucket name mismatch: {Bucket} (expected {ConfiguredBucket})", bucket, configuredBucket);
+                return BadRequest("Invalid transcript blob URL bucket.");
+            }
         }
 
         logger.LogInformation("Job Callback Received: JobId={JobId} DetectedLanguage={Lang}", jobId, dto.DetectedLanguage);
