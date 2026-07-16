@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using VideoHub.Api.Infrastructure.Abstractions;
 using VideoHub.Api.Infrastructure.Options;
+using System.IO;
 
 namespace VideoHub.Api.Infrastructure.Storage;
 
@@ -50,6 +51,19 @@ public sealed class LocalBlobStorage : IBlobStorage
         TimeSpan expiry,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<string?>(blobPath);
+        var relativePath = blobPath;
+        if (Path.IsPathRooted(blobPath))
+        {
+            relativePath = Path.GetRelativePath(rootPath, blobPath);
+        }
+
+        var fullPath = Path.Combine(rootPath, relativePath);
+        if (!File.Exists(fullPath))
+        {
+            return Task.FromResult<string?>(null);
+        }
+
+        var safePath = relativePath.Replace('\\', '/').TrimStart('/');
+        return Task.FromResult<string?>($"http://localhost:5000/blobs/{safePath}");
     }
 }

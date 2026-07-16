@@ -120,7 +120,7 @@ public sealed class SupabaseBlobStorage : IBlobStorage
 
             var encodedSegments = relativePath
                 .Split('/', StringSplitOptions.RemoveEmptyEntries)
-                .Select(Uri.EscapeDataString);
+                .Select(segment => Uri.EscapeDataString(Uri.UnescapeDataString(segment)));
             var objectPath = string.Join('/', encodedSegments);
 
             using var response = await httpClient.PostAsJsonAsync(
@@ -146,6 +146,10 @@ public sealed class SupabaseBlobStorage : IBlobStorage
                     return signedPath;
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

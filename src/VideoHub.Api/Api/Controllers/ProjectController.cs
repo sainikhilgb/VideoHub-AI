@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using VideoHub.Api.Infrastructure.Abstractions;
 using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Application.CurrentUser;
@@ -134,19 +135,36 @@ public sealed class ProjectController : ControllerBase
 
             var transcripts = await query.ToListAsync(cancellationToken);
 
-            var dtos = new List<ProjectTranscriptResponseDto>();
-            foreach (var t in transcripts)
+            using var semaphore = new SemaphoreSlim(4);
+            var tasks = transcripts.Select(async t =>
             {
-                var responseUrl = t.BlobUrl;
-                if (!string.IsNullOrEmpty(responseUrl) && responseUrl.Contains("/storage/v1/object/authenticated/"))
+                await semaphore.WaitAsync(cancellationToken);
+                try
                 {
-                    responseUrl = await blobStorage.GetSignedUrlAsync(responseUrl, TimeSpan.FromHours(1), cancellationToken);
-                    if (string.IsNullOrEmpty(responseUrl))
+                    var responseUrl = t.BlobUrl;
+                    if (!string.IsNullOrEmpty(responseUrl) && responseUrl.Contains("/storage/v1/object/authenticated/"))
                     {
-                        return StatusCode(StatusCodes.Status502BadGateway, "Unable to access one or more private storage assets.");
+                        responseUrl = await blobStorage.GetSignedUrlAsync(responseUrl, TimeSpan.FromHours(1), cancellationToken);
                     }
+                    return new { Transcript = t, Url = responseUrl };
                 }
-                dtos.Add(new ProjectTranscriptResponseDto(t.Id, t.Language, t.Status, responseUrl, t.Version));
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
+
+            var results = await Task.WhenAll(tasks);
+
+            var dtos = new List<ProjectTranscriptResponseDto>();
+            foreach (var r in results)
+            {
+                var url = r.Url;
+                if (!string.IsNullOrEmpty(r.Transcript.BlobUrl) && r.Transcript.BlobUrl.Contains("/storage/v1/object/authenticated/") && string.IsNullOrEmpty(url))
+                {
+                    return StatusCode(StatusCodes.Status502BadGateway, "Unable to access one or more private storage assets.");
+                }
+                dtos.Add(new ProjectTranscriptResponseDto(r.Transcript.Id, r.Transcript.Language, r.Transcript.Status, url, r.Transcript.Version));
             }
 
             return Ok(dtos);

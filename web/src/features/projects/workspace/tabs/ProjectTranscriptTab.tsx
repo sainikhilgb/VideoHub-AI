@@ -244,16 +244,17 @@ export const ProjectTranscriptTab: React.FC = () => {
                 {content.segments.map((seg, idx) => {
                   const isActive = idx === activeSegmentIndex
                   return (
-                    <div
+                    <button
                       key={idx}
                       id={`segment-${idx}`}
+                      type="button"
                       onClick={() => {
                         if (playerRef.current) {
                           playerRef.current.currentTime = seg.start
                           playerRef.current.play().catch(() => {})
                         }
                       }}
-                      className={`p-3.5 rounded-lg border transition-all flex gap-4 cursor-pointer select-none ${
+                      className={`p-3.5 rounded-lg border transition-all flex gap-4 cursor-pointer select-none w-full text-left ${
                         isActive
                           ? 'bg-accent/5 border-accent shadow-sm ring-1 ring-accent/20'
                           : 'bg-slate-50 border-border-custom/50 hover:bg-slate-100/50'
@@ -267,7 +268,7 @@ export const ProjectTranscriptTab: React.FC = () => {
                           {seg.text}
                         </p>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
