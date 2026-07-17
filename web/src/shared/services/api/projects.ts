@@ -273,7 +273,9 @@ export const useProjectCaptions = (projectId: string | undefined) => {
     queryKey: ['projectCaptions', projectId],
     queryFn: async () => {
       if (!projectId) return []
-      const response = await apiClient.get<ProjectCaptionResponse[]>(`/v1/caption-files/project/${projectId}`)
+      const response = await apiClient.get<ProjectCaptionResponse[]>(
+        `/v1/caption-files/project/${projectId}`,
+      )
       return response.data
     },
     enabled: !!projectId,
@@ -289,7 +291,11 @@ export interface ProjectTranscriptResponse {
   version: number
 }
 
-export const useProjectTranscript = (projectId: string | undefined, language?: string, version?: number) => {
+export const useProjectTranscript = (
+  projectId: string | undefined,
+  language?: string,
+  version?: number,
+) => {
   return useQuery<ProjectTranscriptResponse | null>({
     queryKey: ['projectTranscript', projectId, language, version],
     queryFn: async () => {
@@ -299,7 +305,7 @@ export const useProjectTranscript = (projectId: string | undefined, language?: s
         if (language) params.append('language', language)
         if (version) params.append('version', version.toString())
         const response = await apiClient.get<ProjectTranscriptResponse>(
-          `/v1/projects/${projectId}/transcript?${params.toString()}`
+          `/v1/projects/${projectId}/transcript?${params.toString()}`,
         )
         return response.data
       } catch (err: unknown) {
@@ -338,15 +344,17 @@ export const useProjectCombinedMedia = (projectId: string | undefined) => {
     queryKey: ['projectCombinedMedia', projectId],
     queryFn: async () => {
       if (!projectId) return []
-      const response = await apiClient.get<CombinedMediaResponse[]>(`/v1/projects/${projectId}/combined-media`)
+      const response = await apiClient.get<CombinedMediaResponse[]>(
+        `/v1/projects/${projectId}/combined-media`,
+      )
       return response.data
     },
     enabled: !!projectId,
     refetchInterval: (query) => {
       const data = query.state.data as CombinedMediaResponse[] | undefined
-      const hasProcessing = data?.some(cm => cm.status === 'Queued' || cm.status === 'Processing')
+      const hasProcessing = data?.some((cm) => cm.status === 'Queued' || cm.status === 'Processing')
       return hasProcessing ? 3000 : false
-    }
+    },
   })
 }
 
@@ -354,15 +362,18 @@ export const useCombineMedia = () => {
   const queryClient = useQueryClient()
   return useMutation<CombinedMediaResponse, Error, CombineMediaParams>({
     mutationFn: async ({ projectId, mediaFileId, captionFileId, muxType }) => {
-      const response = await apiClient.post<CombinedMediaResponse>(`/v1/projects/${projectId}/combined-media/combine`, {
-        mediaFileId,
-        captionFileId,
-        muxType
-      })
+      const response = await apiClient.post<CombinedMediaResponse>(
+        `/v1/projects/${projectId}/combined-media/combine`,
+        {
+          mediaFileId,
+          captionFileId,
+          muxType,
+        },
+      )
       return response.data
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['projectCombinedMedia', variables.projectId] })
-    }
+    },
   })
 }

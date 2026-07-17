@@ -37,7 +37,7 @@ interface TranscriptContent {
 export const ProjectTranscriptTab: React.FC = () => {
   const project = useOutletContext<Project>()
   const navigate = useNavigate()
-  
+
   const [selectedMediaId, setSelectedMediaId] = useState<string>('')
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [content, setContent] = useState<TranscriptContent | null>(null)
@@ -46,20 +46,19 @@ export const ProjectTranscriptTab: React.FC = () => {
   const playerRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
 
   // API Queries & Mutations
-  const { data: transcriptInfo, isLoading: isMetadataLoading, refetch: refetchTranscript } = useProjectTranscript(
-    project.id,
-    project.originalLanguage,
-    1
-  )
+  const {
+    data: transcriptInfo,
+    isLoading: isMetadataLoading,
+    refetch: refetchTranscript,
+  } = useProjectTranscript(project.id, project.originalLanguage, 1)
   const { data: mediaFiles, isLoading: isMediaLoading } = useProjectMedia(project.id)
   const { data: jobStatus } = useJobStatus(activeJobId ?? undefined, !!activeJobId)
   const generateCaptions = useGenerateCaptions()
 
-  const activeMedia = mediaFiles?.find(m => m.id === selectedMediaId)
+  const activeMedia = mediaFiles?.find((m) => m.id === selectedMediaId)
 
-  const activeSegmentIndex = content?.segments.findIndex(
-    seg => currentTime >= seg.start && currentTime <= seg.end
-  ) ?? -1
+  const activeSegmentIndex =
+    content?.segments.findIndex((seg) => currentTime >= seg.start && currentTime <= seg.end) ?? -1
 
   useEffect(() => {
     if (activeSegmentIndex !== -1) {
@@ -70,39 +69,45 @@ export const ProjectTranscriptTab: React.FC = () => {
     }
   }, [activeSegmentIndex])
 
+  // Only run this effect when mediaFiles changes (avoid including selectedMediaId in deps)
   useEffect(() => {
     if (mediaFiles && mediaFiles.length > 0 && !selectedMediaId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedMediaId(mediaFiles[0].id)
     }
-  }, [mediaFiles, selectedMediaId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaFiles])
 
+  // Respond to jobStatus changes. Include activeJobId in deps and guard to avoid cascading renders.
   useEffect(() => {
-    if (jobStatus) {
-      const status = jobStatus.status.toLowerCase()
-      if (status === 'completed' || status === 'failed') {
-        refetchTranscript()
-        setActiveJobId(null)
-        if (status === 'failed') {
-          toast.error("Speech transcription job failed.")
-        } else {
-          toast.success("Speech transcription completed successfully!")
-        }
+    if (!jobStatus) return
+    const status = jobStatus.status.toLowerCase()
+    if ((status === 'completed' || status === 'failed') && activeJobId !== null) {
+      refetchTranscript()
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveJobId(null)
+      if (status === 'failed') {
+        toast.error('Speech transcription job failed.')
+      } else {
+        toast.success('Speech transcription completed successfully!')
       }
     }
-  }, [jobStatus, refetchTranscript])
+  }, [jobStatus, refetchTranscript, activeJobId])
 
   useEffect(() => {
     if (transcriptInfo?.blobUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsContentLoading(true)
       const controller = new AbortController()
 
-      axios.get<TranscriptContent>(transcriptInfo.blobUrl, { signal: controller.signal })
-        .then(res => {
+      axios
+        .get<TranscriptContent>(transcriptInfo.blobUrl, { signal: controller.signal })
+        .then((res) => {
           setContent(res.data)
         })
-        .catch(err => {
+        .catch((err) => {
           if (!axios.isCancel(err)) {
-            console.error("Failed to load transcript JSON", err)
+            console.error('Failed to load transcript JSON', err)
             setContent(null)
           }
         })
@@ -117,35 +122,37 @@ export const ProjectTranscriptTab: React.FC = () => {
       }
     } else {
       setContent(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsContentLoading(false)
     }
   }, [transcriptInfo?.blobUrl])
 
   const handleTriggerTranscription = async () => {
     if (!selectedMediaId) {
-      toast.error("Please select a media asset to transcribe.")
+      toast.error('Please select a media asset to transcribe.')
       return
     }
 
     if (!activeMedia) {
-      toast.error("Selected media asset not found.")
+      toast.error('Selected media asset not found.')
       return
     }
 
-    const toastId = toast.loading("Queueing speech-to-text transcription job...")
+    const toastId = toast.loading('Queueing speech-to-text transcription job...')
     try {
       const result = await generateCaptions.mutateAsync({
         projectId: project.id,
         mediaId: activeMedia.id,
         targetLanguages: [project.originalLanguage],
       })
-      toast.success("AI Transcription queued successfully!", { id: toastId })
+      toast.success('AI Transcription queued successfully!', { id: toastId })
       if (result?.jobId) {
         setActiveJobId(result.jobId)
       } else {
         refetchTranscript()
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to queue transcription"
+      const msg = err instanceof Error ? err.message : 'Failed to queue transcription'
       toast.error(msg, { id: toastId })
     }
   }
@@ -182,8 +189,10 @@ export const ProjectTranscriptTab: React.FC = () => {
             className="w-full rounded-lg border border-border-custom bg-card px-3 py-1.5 text-xs font-semibold text-text-main focus:border-accent focus:outline-none"
           >
             <option value="">-- Choose a media file --</option>
-            {mediaFiles?.map(m => (
-              <option key={m.id} value={m.id}>{m.fileName}</option>
+            {mediaFiles?.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.fileName}
+              </option>
             ))}
           </select>
         </div>
@@ -227,7 +236,10 @@ export const ProjectTranscriptTab: React.FC = () => {
         <div className="grid gap-6 md:grid-cols-3">
           {/* Main timeline */}
           <div className="md:col-span-2 space-y-6">
-            <SectionCard title="Media Playback Preview" subtitle="Review output and synchronize video/audio media.">
+            <SectionCard
+              title="Media Playback Preview"
+              subtitle="Review output and synchronize video/audio media."
+            >
               <MediaPlayer
                 src={activeMedia?.url}
                 contentType={activeMedia?.contentType}
@@ -264,9 +276,7 @@ export const ProjectTranscriptTab: React.FC = () => {
                         {formatTime(seg.start)} - {formatTime(seg.end)}
                       </span>
                       <div className="space-y-1 flex-1">
-                        <p className="text-sm text-text-main leading-relaxed m-0">
-                          {seg.text}
-                        </p>
+                        <p className="text-sm text-text-main leading-relaxed m-0">{seg.text}</p>
                       </div>
                     </button>
                   )
@@ -281,7 +291,9 @@ export const ProjectTranscriptTab: React.FC = () => {
               <dl className="space-y-3 text-xs select-none mb-4">
                 <div className="flex justify-between py-1 border-b border-border-custom/40">
                   <dt className="text-text-muted">Detected Language</dt>
-                  <dd className="font-semibold text-text-main">{content.detectedLanguage.toUpperCase()}</dd>
+                  <dd className="font-semibold text-text-main">
+                    {content.detectedLanguage.toUpperCase()}
+                  </dd>
                 </div>
                 <div className="flex justify-between py-1 border-b border-border-custom/40">
                   <dt className="text-text-muted">Total Segments</dt>

@@ -1,5 +1,11 @@
 import { apiClient } from '@/shared/services/api/client'
-import type { LoginResponse, RegisterResponse, UserProfile, LoginRequest, RegisterRequest } from '../types'
+import type {
+  LoginResponse,
+  RegisterResponse,
+  UserProfile,
+  LoginRequest,
+  RegisterRequest,
+} from '../types'
 
 export const authApi = {
   register: async (data: RegisterRequest): Promise<RegisterResponse> => {

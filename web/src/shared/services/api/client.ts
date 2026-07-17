@@ -85,12 +85,12 @@ apiClient.interceptors.response.use(
     const errorMessage =
       data?.detail || data?.message || error.message || 'An unexpected error occurred'
 
-    const isAuthRequest = originalRequest.url && (
-      originalRequest.url.endsWith('/v1/auth/login') ||
-      originalRequest.url.endsWith('/v1/auth/register') ||
-      originalRequest.url.endsWith('/v1/auth/refresh') ||
-      originalRequest.url.endsWith('/v1/auth/logout')
-    )
+    const isAuthRequest =
+      originalRequest.url &&
+      (originalRequest.url.endsWith('/v1/auth/login') ||
+        originalRequest.url.endsWith('/v1/auth/register') ||
+        originalRequest.url.endsWith('/v1/auth/refresh') ||
+        originalRequest.url.endsWith('/v1/auth/logout'))
 
     // Handle JWT Token Expired / Refresh
     if (status === 401 && !originalRequest._retry && !isAuthRequest) {
