@@ -122,6 +122,8 @@ export const ProjectTranscriptTab: React.FC = () => {
       }
     } else {
       setContent(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsContentLoading(false)
     }
   }, [transcriptInfo?.blobUrl])
 
