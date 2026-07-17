@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profile = await authApi.getCurrentUser()
       setUser(profile)
       localStorage.setItem('user_id', profile.id)
-    } catch (error) {
+    } catch {
       setAccessToken(null)
       localStorage.removeItem('user_email')
       localStorage.removeItem('user_id')

@@ -8,7 +8,7 @@ import {
   useProjectMedia,
   useProjectCombinedMedia,
   useCombineMedia,
-  type Project
+  type Project,
 } from '@/shared/services/api/projects'
 import { MediaPlayer } from '@/shared/components/ui/MediaPlayer'
 import toast from 'react-hot-toast'
@@ -23,35 +23,38 @@ export const ProjectCaptionsTab: React.FC = () => {
   const { data: combinedMediaList } = useProjectCombinedMedia(project.id)
   const combineMedia = useCombineMedia()
 
-  const completedCaptions = captions?.filter(c => c.status.toLowerCase() === 'completed' && !!c.blobUrl) || []
+  const completedCaptions =
+    captions?.filter((c) => c.status.toLowerCase() === 'completed' && !!c.blobUrl) || []
   const hasCaptions = completedCaptions.length > 0
   const activeMedia = mediaFiles && mediaFiles.length > 0 ? mediaFiles[0] : null
 
-  const vttCaptions = completedCaptions.filter(c => c.format.toLowerCase() === 'vtt')
-  const activeVtt = vttCaptions.find(c => c.id === selectedVttId) || vttCaptions[0] || null
+  const vttCaptions = completedCaptions.filter((c) => c.format.toLowerCase() === 'vtt')
+  const activeVtt = vttCaptions.find((c) => c.id === selectedVttId) || vttCaptions[0] || null
 
   useEffect(() => {
     if (vttCaptions.length > 0 && !selectedVttId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedVttId(vttCaptions[0].id)
     }
-  }, [vttCaptions, selectedVttId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vttCaptions])
 
   const handleCombine = async (captionId: string) => {
     if (!activeMedia) {
-      toast.error("No active media file is available for combining subtitles.")
+      toast.error('No active media file is available for combining subtitles.')
       return
     }
-    const toastId = toast.loading("Queueing subtitles video combining job...")
+    const toastId = toast.loading('Queueing subtitles video combining job...')
     try {
       await combineMedia.mutateAsync({
         projectId: project.id,
         mediaFileId: activeMedia.id,
         captionFileId: captionId,
-        muxType: 'SoftMux'
+        muxType: 'SoftMux',
       })
-      toast.success("Subtitles combined video processing job queued!", { id: toastId })
+      toast.success('Subtitles combined video processing job queued!', { id: toastId })
     } catch (err: any) {
-      toast.error(err.message || "Failed to start combined video job.", { id: toastId })
+      toast.error(err.message || 'Failed to start combined video job.', { id: toastId })
     }
   }
 
@@ -85,8 +88,12 @@ export const ProjectCaptionsTab: React.FC = () => {
                   className="flex flex-col items-center justify-center p-6 border border-border-custom rounded-xl bg-slate-50/40 hover:bg-slate-50 transition-colors select-none text-center"
                 >
                   <Subtitles className="h-8 w-8 text-accent mb-3" />
-                  <span className="text-sm font-bold text-text-main">{caption.format.toUpperCase()} Format</span>
-                  <span className="text-sm text-text-muted mt-0.5 mb-4">Language: {caption.language.toUpperCase()}</span>
+                  <span className="text-sm font-bold text-text-main">
+                    {caption.format.toUpperCase()} Format
+                  </span>
+                  <span className="text-sm text-text-muted mt-0.5 mb-4">
+                    Language: {caption.language.toUpperCase()}
+                  </span>
 
                   <a
                     href={caption.blobUrl || undefined}
@@ -103,11 +110,19 @@ export const ProjectCaptionsTab: React.FC = () => {
             </div>
           </SectionCard>
 
-          <SectionCard title="Subtitle Playback Preview" subtitle="Review line layouts overlaying media.">
+          <SectionCard
+            title="Subtitle Playback Preview"
+            subtitle="Review line layouts overlaying media."
+          >
             <div className="space-y-4">
               {vttCaptions.length > 1 && (
                 <div className="flex items-center gap-2 pb-2">
-                  <label htmlFor="preview-language-select" className="text-xs font-medium text-text-muted">Select Language Overlay:</label>
+                  <label
+                    htmlFor="preview-language-select"
+                    className="text-xs font-medium text-text-muted"
+                  >
+                    Select Language Overlay:
+                  </label>
                   <select
                     id="preview-language-select"
                     value={selectedVttId}
@@ -140,7 +155,12 @@ export const ProjectCaptionsTab: React.FC = () => {
               {/* Trigger controls */}
               <div className="flex flex-col sm:flex-row gap-4 p-4 border border-border-custom bg-slate-50/40 rounded-xl">
                 <div className="flex-1 space-y-1">
-                  <label htmlFor="combine-language-select" className="text-xs font-semibold text-text-main">Choose Subtitle Language</label>
+                  <label
+                    htmlFor="combine-language-select"
+                    className="text-xs font-semibold text-text-main"
+                  >
+                    Choose Subtitle Language
+                  </label>
                   <select
                     id="combine-language-select"
                     value={selectedVttId}
@@ -175,7 +195,9 @@ export const ProjectCaptionsTab: React.FC = () => {
               {/* Existing / processing combined exports */}
               {combinedMediaList && combinedMediaList.length > 0 && (
                 <div className="space-y-3 pt-2">
-                  <span className="text-xs font-bold text-text-main">Completed & Processing Muxes</span>
+                  <span className="text-xs font-bold text-text-main">
+                    Completed & Processing Muxes
+                  </span>
                   <div className="grid gap-3">
                     {combinedMediaList.map((cm) => (
                       <div
@@ -203,8 +225,8 @@ export const ProjectCaptionsTab: React.FC = () => {
                               cm.status === 'Completed'
                                 ? 'bg-success/10 text-success'
                                 : cm.status === 'Failed'
-                                ? 'bg-danger/10 text-danger'
-                                : 'bg-accent/10 text-accent animate-pulse'
+                                  ? 'bg-danger/10 text-danger'
+                                  : 'bg-accent/10 text-accent animate-pulse'
                             }`}
                           >
                             {cm.status}

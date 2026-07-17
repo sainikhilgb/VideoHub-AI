@@ -37,7 +37,8 @@ export const RegisterPage: React.FC = () => {
       if (!/[A-Z]/.test(password)) newErrors.password = 'Must contain at least one uppercase letter'
       if (!/[a-z]/.test(password)) newErrors.password = 'Must contain at least one lowercase letter'
       if (!/[0-9]/.test(password)) newErrors.password = 'Must contain at least one digit'
-      if (!/[^a-zA-Z0-9]/.test(password)) newErrors.password = 'Must contain at least one special character'
+      if (!/[^a-zA-Z0-9]/.test(password))
+        newErrors.password = 'Must contain at least one special character'
     }
     if (confirmPassword !== password) {
       newErrors.confirmPassword = 'Passwords do not match'
@@ -75,12 +76,13 @@ export const RegisterPage: React.FC = () => {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-white shadow-custom-md mb-4 transition-transform hover:scale-105">
             <Play className="h-6 w-6 fill-current ml-0.5" />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-text-main">
-            Create your account
-          </h2>
+          <h2 className="text-2xl font-bold tracking-tight text-text-main">Create your account</h2>
           <p className="mt-2 text-sm text-text-muted">
             Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-accent hover:text-accent-hover transition-colors">
+            <Link
+              to="/login"
+              className="font-semibold text-accent hover:text-accent-hover transition-colors"
+            >
               Sign in
             </Link>
           </p>
@@ -91,7 +93,10 @@ export const RegisterPage: React.FC = () => {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-text-main mb-1.5">
+                <label
+                  htmlFor="firstName"
+                  className="block text-sm font-medium text-text-main mb-1.5"
+                >
                   First Name
                 </label>
                 <input
@@ -111,7 +116,10 @@ export const RegisterPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-text-main mb-1.5">
+                <label
+                  htmlFor="lastName"
+                  className="block text-sm font-medium text-text-main mb-1.5"
+                >
                   Last Name
                 </label>
                 <input
@@ -182,7 +190,10 @@ export const RegisterPage: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-text-main mb-1.5">
+              <label
+                htmlFor="confirmPassword"
+                className="block text-sm font-medium text-text-main mb-1.5"
+              >
                 Confirm Password
               </label>
               <input
@@ -193,7 +204,8 @@ export const RegisterPage: React.FC = () => {
                 autoComplete="new-password"
                 onChange={(e) => {
                   setConfirmPassword(e.target.value)
-                  if (errors.confirmPassword) setErrors((prev) => ({ ...prev, confirmPassword: undefined }))
+                  if (errors.confirmPassword)
+                    setErrors((prev) => ({ ...prev, confirmPassword: undefined }))
                 }}
                 className="w-full rounded-lg border border-border-custom bg-card px-3 py-2 text-sm text-text-main shadow-custom-sm placeholder:text-text-muted/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
               />

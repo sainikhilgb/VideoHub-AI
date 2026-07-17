@@ -40,7 +40,10 @@ export const LoginPage: React.FC = () => {
       navigate('/')
     } catch (error: any) {
       console.error('Login error', error)
-      const errorMsg = error?.response?.data?.detail || error?.response?.data?.message || 'Login failed. Please check your credentials.'
+      const errorMsg =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        'Login failed. Please check your credentials.'
       toast.error(errorMsg)
     } finally {
       setIsSubmitting(false)
@@ -60,7 +63,10 @@ export const LoginPage: React.FC = () => {
           </h2>
           <p className="mt-2 text-sm text-text-muted">
             Or{' '}
-            <Link to="/register" className="font-semibold text-accent hover:text-accent-hover transition-colors">
+            <Link
+              to="/register"
+              className="font-semibold text-accent hover:text-accent-hover transition-colors"
+            >
               create a new account
             </Link>
           </p>
@@ -109,7 +115,7 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-text-muted hover:text-text-main focus:outline-none"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
