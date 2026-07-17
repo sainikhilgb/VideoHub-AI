@@ -19,6 +19,21 @@ services:
       timeout: 10s
       retries: 3
 
+  dotnet-api:
+    build:
+      context: ./src/VideoHub.Api
+      dockerfile: Dockerfile
+    container_name: videohub-dotnet-api
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   web:
     build:
       context: ./web
@@ -35,6 +50,9 @@ services:
       - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:8000
+      - VITE_DOTNET_API_URL=http://localhost:5000
     depends_on:
       api:
         condition: service_healthy
+      dotnet-api:
+        condition: service_started
