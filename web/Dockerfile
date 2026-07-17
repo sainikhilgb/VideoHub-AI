@@ -12,6 +12,12 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
+# Ensure /app is owned by the node user
+RUN chown -R node:node /app
+
+# Switch to the node user
+USER node
+
 # Expose Vite's default dev server port
 EXPOSE 5173
 
