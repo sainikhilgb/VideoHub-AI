@@ -8,9 +8,11 @@ import { StatusBadge } from '@/shared/components/ui/StatusBadge'
 import { LoadingSpinner } from '@/shared/components/ui/LoadingSpinner'
 import { useProjects } from '@/shared/services/api/projects'
 import { ErrorState } from '@/shared/components/ui/ErrorState'
+import { useAuth } from '@/features/auth/context/AuthContext'
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { data: projects, isLoading, isError, refetch } = useProjects()
 
   if (isLoading) {
@@ -53,10 +55,10 @@ export const DashboardPage: React.FC = () => {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Welcome Section */}
       <PageHeader
-        title="Welcome back, Nick!"
+        title={`Welcome back, ${user?.firstName || 'User'}!`}
         description="Here is the overview of your VideoHub AI workspace processing activities."
         actions={
           <Link
@@ -70,7 +72,7 @@ export const DashboardPage: React.FC = () => {
       />
 
       {/* Statistics Cards Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-slide-up" style={{ animationDelay: '0.1s' }}>
         {stats.map((stat, i) => (
           <DashboardCard
             key={i}
@@ -84,7 +86,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Main Grid content: Recent Projects & Sidebar Activities */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 animate-slide-up" style={{ animationDelay: '0.2s' }}>
         {/* Left Column: Recent Projects Table */}
         <div className="lg:col-span-2 space-y-6">
           <SectionCard

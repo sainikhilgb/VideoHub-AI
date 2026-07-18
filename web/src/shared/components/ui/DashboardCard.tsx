@@ -25,7 +25,7 @@ export const DashboardCard: React.FC<DashboardCardProps> = ({
   return (
     <div
       className={clsx(
-        'rounded-xl border border-border-custom bg-card p-5 shadow-custom-sm transition-all duration-200 hover:shadow-custom-md',
+        'rounded-xl border border-border-custom glassmorphism p-5 shadow-custom-sm transition-all duration-300 hover:shadow-custom-lg hover:-translate-y-1',
         className,
       )}
     >

@@ -18,6 +18,7 @@ public static class ApplicationExtensions
         services.AddScoped<IMediaUploadService, MediaUploadService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<ICaptionService, CaptionService>();
+        services.AddScoped<ICaptionGeneratorService, CaptionGeneratorService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         return services;
     }

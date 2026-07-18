@@ -21,7 +21,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   return (
     <div
       className={clsx(
-        'rounded-xl border border-border-custom bg-card shadow-custom-sm overflow-hidden',
+        'rounded-xl border border-border-custom glassmorphism shadow-custom-sm overflow-hidden transition-all duration-300 hover:shadow-custom-md',
         className,
       )}
     >

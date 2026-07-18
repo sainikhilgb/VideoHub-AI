@@ -170,4 +170,86 @@ public sealed class ProjectController : ControllerBase
             return Ok(dtos);
         }
     }
+
+    /// <summary>
+    /// Updates the speech transcript JSON without regenerating captions.
+    /// </summary>
+    [HttpPut("{projectId:guid}/transcript/{transcriptId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateProjectTranscript(
+        Guid projectId,
+        Guid transcriptId,
+        [FromBody] TranscriptUpdateRequestDto request,
+        [FromServices] IRepository<Project> projectRepository,
+        [FromServices] AppDbContext dbContext,
+        [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IBlobStorage blobStorage,
+        CancellationToken cancellationToken)
+    {
+        var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
+        if (project is null) return NotFound($"Project '{projectId}' was not found.");
+
+        if (project.UserId != currentUserService.UserId)
+            return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to access this project.");
+
+        var transcript = await dbContext.Transcripts.FirstOrDefaultAsync(t => t.Id == transcriptId && t.ProjectId == projectId, cancellationToken);
+        if (transcript is null) return NotFound($"Transcript '{transcriptId}' not found.");
+
+        // 1. Update Transcript JSON in Blob Storage
+        var options = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+        string jsonContent = System.Text.Json.JsonSerializer.Serialize(request.Content, options);
+        using var jsonStream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(jsonContent));
+        
+        var transcriptPath = $"{project.UserId}/{projectId}/transcripts/transcript.json";
+        await blobStorage.UploadAsync(jsonStream, transcriptPath, "application/json", cancellationToken);
+        
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Explicitly generates new caption files (.srt, .vtt) from a given transcript JSON payload.
+    /// </summary>
+    [HttpPost("{projectId:guid}/transcript/{transcriptId:guid}/generate-captions")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GenerateCaptionsFromTranscript(
+        Guid projectId,
+        Guid transcriptId,
+        [FromBody] TranscriptUpdateRequestDto request,
+        [FromServices] IRepository<Project> projectRepository,
+        [FromServices] AppDbContext dbContext,
+        [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IBlobStorage blobStorage,
+        [FromServices] VideoHub.Api.Application.Captions.ICaptionGeneratorService captionGenerator,
+        CancellationToken cancellationToken)
+    {
+        var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
+        if (project is null) return NotFound($"Project '{projectId}' was not found.");
+
+        if (project.UserId != currentUserService.UserId)
+            return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to access this project.");
+
+        var transcript = await dbContext.Transcripts.FirstOrDefaultAsync(t => t.Id == transcriptId && t.ProjectId == projectId, cancellationToken);
+        if (transcript is null) return NotFound($"Transcript '{transcriptId}' not found.");
+
+        // 1. Generate new SRT and VTT from the provided JSON content
+        var srtContent = captionGenerator.GenerateSrt(request.Content);
+        var vttContent = captionGenerator.GenerateVtt(request.Content);
+
+        // 2. Upload new SRT and VTT to Blob Storage (overwriting existing versions for this transcript)
+        using var srtStream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(srtContent));
+        var srtPath = $"{project.UserId}/{projectId}/captions/{transcript.Language}/transcript.srt";
+        await blobStorage.UploadAsync(srtStream, srtPath, "text/plain", cancellationToken);
+
+        using var vttStream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(vttContent));
+        var vttPath = $"{project.UserId}/{projectId}/captions/{transcript.Language}/transcript.vtt";
+        await blobStorage.UploadAsync(vttStream, vttPath, "text/plain", cancellationToken);
+
+        // We assume the CaptionFile records in DB already point to these URLs or are generic enough that overwriting is sufficient.
+        
+        return NoContent();
+    }
 }
