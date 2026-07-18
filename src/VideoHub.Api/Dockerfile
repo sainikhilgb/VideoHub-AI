@@ -18,7 +18,7 @@ COPY --from=build /app/publish .
 
 # Expose port 5000 (we will configure ASP.NET to listen on this port)
 EXPOSE 5000
-ENV ASPNETCORE_URLS=http+:5000
+ENV ASPNETCORE_URLS=http://+:5000
 
 # Install curl for the docker-compose healthcheck
 RUN apt-get update && \

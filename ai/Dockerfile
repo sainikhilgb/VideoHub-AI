@@ -32,5 +32,5 @@ USER appuser
 # Expose port 8000 for FastAPI
 EXPOSE 8000
 
-# Command to run the dev server with live reload
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Command to run the FastAPI app
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
