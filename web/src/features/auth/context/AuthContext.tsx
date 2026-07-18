@@ -1,19 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { authApi } from '../services/authApi'
 import type { UserProfile } from '../types'
 import { setAccessToken } from '@/shared/services/api/client'
 import toast from 'react-hot-toast'
-
-interface AuthContextType {
-  user: UserProfile | null
-  isAuthenticated: boolean
-  isLoading: boolean
-  login: (accessToken: string, email: string) => Promise<void>
-  logout: () => Promise<void>
-  refreshProfile: () => Promise<void>
-}
-
-export const AuthContext = createContext<AuthContextType | undefined>(undefined)
+import { AuthContext } from './AuthContextDef'
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null)
