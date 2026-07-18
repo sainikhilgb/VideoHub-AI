@@ -179,6 +179,12 @@ The current data model supports the transcription workflow:
   - Enqueues a Hangfire media-processing placeholder job.
   - Returns `202 Accepted`.
 
+### Transcripts & Captions
+- `PUT /api/v1/projects/{projectId}/transcript/{transcriptId}`
+  - Updates the speech transcript JSON without regenerating captions.
+- `POST /api/v1/projects/{projectId}/transcript/{transcriptId}/generate-captions`
+  - Explicitly generates new caption files (.srt, .vtt) from a given transcript JSON payload.
+
 ### Background Jobs
 - `POST /api/jobs/hello-world`
   - Queues a fire-and-forget Hangfire job, returns `202 Accepted`
@@ -367,3 +373,47 @@ dotnet dev-certs https --trust
 - The implementation is intentionally infrastructure-first; business feature work should build on top of this foundation.
 - `appsettings.json` is kept minimal and non-secret; secrets and environment-specific values should live in `.env` or production environment variables.
 - Authentication and project-ownership enforcement are fully implemented across all media upload, project, and background job polling endpoints.
+
+## Production Deployment (Vercel & Render)
+
+This application is configured for a multi-platform production deployment using native continuous deployment (CD) on merge to your deployment branch:
+
+### 1. Frontend Web UI (Vercel)
+Connect your repository to Vercel and point the build configuration to the `web` subdirectory:
+- **Framework Preset**: Vite
+- **Root Directory**: `web`
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- **Environment Variables**:
+  - `VITE_API_BASE_URL`: The URL of your deployed .NET API on Render (e.g., `https://videohub-api.onrender.com/api`).
+
+### 2. API Backend (.NET on Render)
+Create a new **Web Service** on Render connected to your repository:
+- **Environment**: Docker
+- **Docker Build Context**: `.` (Repository root)
+- **Dockerfile Path**: `src/VideoHub.Api/Dockerfile`
+- **Environment Variables**:
+  - `ConnectionStrings__DefaultConnection`: Your Supabase PostgreSQL Connection String.
+  - `BlobStorage__Provider`: `Supabase`
+  - `BlobStorage__SupabaseUrl`: Your Supabase URL.
+  - `BlobStorage__SupabaseKey`: Your Supabase service role secret key.
+  - `BlobStorage__BucketName`: Your Supabase Storage bucket name.
+  - `Jwt__Secret`: A secure random password string.
+  - `Jwt__Issuer`: `VideoHubAI`
+  - `Jwt__Audience`: `VideoHubAI.Clients`
+  - `Jwt__ExpiryMinutes`: `60`
+  - `Jwt__RefreshTokenExpiryDays`: `7`
+  - `Jwt__ClockSkewSeconds`: `5`
+  - `AiService__BaseUrl`: The URL of your deployed FastAPI worker on Render (e.g., `https://videohub-ai-worker.onrender.com`).
+
+### 3. AI Worker (FastAPI on Render)
+Create a second **Web Service** on Render connected to your repository:
+- **Environment**: Docker
+- **Docker Build Context**: `.` (Repository root)
+- **Dockerfile Path**: `ai/Dockerfile`
+- **Environment Variables**:
+  - `supabase_url`: Your Supabase URL.
+  - `supabase_key`: Your Supabase service role secret key.
+  - `dotnet_api_base_url`: The URL of your deployed .NET API on Render (e.g., `https://videohub-api.onrender.com`).
+- **Hardware Recommendations**: It is recommended to use at least a Starter instance (1GB+ RAM) to avoid Out Of Memory crashes when Whisper processes larger audio files.
+
