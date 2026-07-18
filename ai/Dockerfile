@@ -17,11 +17,11 @@ RUN apt-get update && \
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Copy requirements file and install dependencies
-COPY requirements.txt .
+COPY ai/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application source code
-COPY . .
+COPY ai/ .
 
 # Change ownership to the non-root user
 RUN chown -R appuser:appuser /app
