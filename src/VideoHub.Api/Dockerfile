@@ -3,13 +3,13 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy csproj and restore as distinct layers
-COPY ["VideoHub.Api.csproj", "./"]
-RUN dotnet restore "VideoHub.Api.csproj"
+COPY ["src/VideoHub.Api/VideoHub.Api.csproj", "src/VideoHub.Api/"]
+RUN dotnet restore "src/VideoHub.Api/VideoHub.Api.csproj"
 
 # Copy everything else and build
 COPY . .
-RUN dotnet build "VideoHub.Api.csproj" -c Release -o /app/build
-RUN dotnet publish "VideoHub.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet build "src/VideoHub.Api/VideoHub.Api.csproj" -c Release -o /app/build
+RUN dotnet publish "src/VideoHub.Api/VideoHub.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
