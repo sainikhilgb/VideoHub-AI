@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { FileText, Loader2, Sparkles } from 'lucide-react'
+import { FileText, Loader2, Sparkles, Edit3, Save, X } from 'lucide-react'
 import { SectionCard } from '@/shared/components/ui/SectionCard'
 import { EmptyState } from '@/shared/components/ui/EmptyState'
 import { MediaPlayer } from '@/shared/components/ui/MediaPlayer'
@@ -9,6 +9,8 @@ import {
   useProjectMedia,
   useGenerateCaptions,
   useJobStatus,
+  useUpdateTranscript,
+  useGenerateCaptionsFromTranscript,
   type Project,
 } from '@/shared/services/api/projects'
 import axios from 'axios'
@@ -44,6 +46,12 @@ export const ProjectTranscriptTab: React.FC = () => {
   const [isContentLoading, setIsContentLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const playerRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
+
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedContent, setEditedContent] = useState<TranscriptContent | null>(null)
+
+  const updateTranscript = useUpdateTranscript()
+  const generateCaptionsFromTranscript = useGenerateCaptionsFromTranscript()
 
   // API Queries & Mutations
   const {
@@ -122,7 +130,6 @@ export const ProjectTranscriptTab: React.FC = () => {
       }
     } else {
       setContent(null)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsContentLoading(false)
     }
   }, [transcriptInfo?.blobUrl])
@@ -155,6 +162,48 @@ export const ProjectTranscriptTab: React.FC = () => {
       const msg = err instanceof Error ? err.message : 'Failed to queue transcription'
       toast.error(msg, { id: toastId })
     }
+  }
+
+  const handleSaveTranscript = async () => {
+    if (!editedContent || !transcriptInfo) return
+    const toastId = toast.loading('Saving transcript draft...')
+    try {
+      await updateTranscript.mutateAsync({
+        projectId: project.id,
+        transcriptId: transcriptInfo.id,
+        content: editedContent,
+      })
+      toast.success('Transcript draft saved successfully!', { id: toastId })
+      setContent(editedContent)
+      setIsEditing(false)
+      refetchTranscript()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to save transcript'
+      toast.error(msg, { id: toastId })
+    }
+  }
+
+  const handleGenerateCaptionsFromTranscript = async () => {
+    if (!content || !transcriptInfo) return
+    const toastId = toast.loading('Generating caption files...')
+    try {
+      await generateCaptionsFromTranscript.mutateAsync({
+        projectId: project.id,
+        transcriptId: transcriptInfo.id,
+        content: content,
+      })
+      toast.success('Caption files (.srt / .vtt) successfully regenerated!', { id: toastId })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate captions'
+      toast.error(msg, { id: toastId })
+    }
+  }
+
+  const handleSegmentTextChange = (idx: number, newText: string) => {
+    if (!editedContent) return
+    const newSegments = [...editedContent.segments]
+    newSegments[idx] = { ...newSegments[idx], text: newText }
+    setEditedContent({ ...editedContent, segments: newSegments })
   }
 
   const formatTime = (seconds: number) => {
@@ -251,34 +300,80 @@ export const ProjectTranscriptTab: React.FC = () => {
             <SectionCard
               title="Speech Transcript editor"
               subtitle="Review and correct generated speech segments."
-            >
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                {content.segments.map((seg, idx) => {
-                  const isActive = idx === activeSegmentIndex
-                  return (
+              actions={
+                !isEditing ? (
+                  <button
+                    onClick={() => {
+                      setEditedContent(content)
+                      setIsEditing(true)
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border-custom bg-card px-3 py-1.5 text-xs font-semibold text-text-main shadow-custom-sm hover:bg-slate-50 transition-colors"
+                  >
+                    <Edit3 className="h-3.5 w-3.5 text-accent" />
+                    Edit Transcript
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
                     <button
+                      onClick={() => setIsEditing(false)}
+                      disabled={updateTranscript.isPending}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border-custom bg-card px-3 py-1.5 text-xs font-semibold text-text-main shadow-custom-sm hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveTranscript}
+                      disabled={updateTranscript.isPending}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-custom-sm hover:bg-accent-hover transition-colors disabled:opacity-50"
+                    >
+                      {updateTranscript.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Save className="h-3.5 w-3.5" />
+                      )}
+                      Save Changes
+                    </button>
+                  </div>
+                )
+              }
+            >
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                {(isEditing ? editedContent?.segments : content.segments)?.map((seg, idx) => {
+                  const isActive = !isEditing && idx === activeSegmentIndex
+                  return (
+                    <div
                       key={idx}
                       id={`segment-${idx}`}
-                      type="button"
                       onClick={() => {
-                        if (playerRef.current) {
+                        if (!isEditing && playerRef.current) {
                           playerRef.current.currentTime = seg.start
                           playerRef.current.play().catch(() => {})
                         }
                       }}
-                      className={`p-3.5 rounded-lg border transition-all flex gap-4 cursor-pointer select-none w-full text-left ${
+                      className={`p-3.5 rounded-lg border transition-all flex gap-4 ${
+                        !isEditing ? 'cursor-pointer select-none hover:bg-slate-100/50' : ''
+                      } w-full text-left ${
                         isActive
                           ? 'bg-accent/5 border-accent shadow-sm ring-1 ring-accent/20'
-                          : 'bg-slate-50 border-border-custom/50 hover:bg-slate-100/50'
+                          : 'bg-slate-50 border-border-custom/50'
                       }`}
                     >
                       <span className="text-xs font-semibold text-accent shrink-0 mt-0.5">
                         {formatTime(seg.start)} - {formatTime(seg.end)}
                       </span>
                       <div className="space-y-1 flex-1">
-                        <p className="text-sm text-text-main leading-relaxed m-0">{seg.text}</p>
+                        {isEditing ? (
+                          <textarea
+                            value={seg.text}
+                            onChange={(e) => handleSegmentTextChange(idx, e.target.value)}
+                            className="w-full text-sm text-text-main leading-relaxed m-0 bg-white border border-border-custom rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-accent resize-y min-h-[60px]"
+                          />
+                        ) : (
+                          <p className="text-sm text-text-main leading-relaxed m-0">{seg.text}</p>
+                        )}
                       </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
@@ -321,6 +416,24 @@ export const ProjectTranscriptTab: React.FC = () => {
                   <>
                     <Sparkles className="h-3.5 w-3.5 text-accent" />
                     Re-trigger AI Transcription
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleGenerateCaptionsFromTranscript}
+                disabled={generateCaptionsFromTranscript.isPending || isEditing}
+                className="flex items-center justify-center gap-2 w-full rounded-lg border border-transparent bg-accent py-2 text-xs font-semibold text-white hover:bg-accent-hover transition-colors disabled:opacity-50 cursor-pointer mt-3"
+              >
+                {generateCaptionsFromTranscript.isPending ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-3.5 w-3.5 text-white" />
+                    Generate SRT / VTT
                   </>
                 )}
               </button>

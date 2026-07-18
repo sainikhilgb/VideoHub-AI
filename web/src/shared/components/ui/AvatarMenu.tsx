@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { User, Settings, LogOut } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/features/auth/context/AuthContext'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 
 export const AvatarMenu: React.FC = () => {
   const { user, logout } = useAuth()

@@ -9,7 +9,7 @@ export const AppLayout: React.FC = () => {
   const { sidebarOpen, setSidebarOpen } = useUI()
 
   return (
-    <div className="min-h-screen flex bg-app-bg text-text-main font-sans">
+    <div className="min-h-screen flex bg-animated-gradient text-text-main font-sans">
       {/* 1. Desktop & Tablet Sidebar (hidden on mobile, visible on lg/md) */}
       <div className="hidden lg:block shrink-0">
         <Sidebar />

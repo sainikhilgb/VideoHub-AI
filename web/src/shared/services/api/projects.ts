@@ -319,6 +319,64 @@ export const useProjectTranscript = (
   })
 }
 
+// 12.b. Update project transcript
+export interface TranscriptWord {
+  text: string
+  start: number
+  end: number
+  confidence: number | null
+}
+
+export interface TranscriptSegment {
+  start: number
+  end: number
+  text: string
+  confidence: number | null
+  words?: TranscriptWord[]
+}
+
+export interface TranscriptContent {
+  detectedLanguage: string
+  segments: TranscriptSegment[]
+}
+
+export interface UpdateTranscriptParams {
+  projectId: string
+  transcriptId: string
+  content: TranscriptContent
+}
+
+export const useUpdateTranscript = () => {
+  const queryClient = useQueryClient()
+  return useMutation<void, Error, UpdateTranscriptParams>({
+    mutationFn: async ({ projectId, transcriptId, content }) => {
+      await apiClient.put(`/v1/projects/${projectId}/transcript/${transcriptId}`, {
+        content,
+      })
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['projectTranscript', variables.projectId] })
+    },
+  })
+}
+
+export const useGenerateCaptionsFromTranscript = () => {
+  const queryClient = useQueryClient()
+  return useMutation<void, Error, UpdateTranscriptParams>({
+    mutationFn: async ({ projectId, transcriptId, content }) => {
+      await apiClient.post(
+        `/v1/projects/${projectId}/transcript/${transcriptId}/generate-captions`,
+        {
+          content,
+        },
+      )
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['projectCaptions', variables.projectId] })
+    },
+  })
+}
+
 // 13. Combined Subtitle Video Muxing (Soft-Mux)
 export interface CombinedMediaResponse {
   id: string

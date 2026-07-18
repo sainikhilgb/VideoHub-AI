@@ -11,7 +11,7 @@ export const Navbar: React.FC = () => {
   const { setSidebarOpen } = useUI()
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border-custom bg-card px-4 md:px-6 shadow-custom-sm sticky top-0 z-30 select-none">
+    <header className="flex h-16 items-center justify-between border-b border-border-custom glassmorphism px-4 md:px-6 shadow-custom-sm sticky top-0 z-30 select-none">
       {/* Left side: Hamburger (mobile/tablet) + Breadcrumbs */}
       <div className="flex items-center gap-3">
         <button
