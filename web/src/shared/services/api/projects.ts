@@ -364,9 +364,12 @@ export const useGenerateCaptionsFromTranscript = () => {
   const queryClient = useQueryClient()
   return useMutation<void, Error, UpdateTranscriptParams>({
     mutationFn: async ({ projectId, transcriptId, content }) => {
-      await apiClient.post(`/v1/projects/${projectId}/transcript/${transcriptId}/generate-captions`, {
-        content,
-      })
+      await apiClient.post(
+        `/v1/projects/${projectId}/transcript/${transcriptId}/generate-captions`,
+        {
+          content,
+        },
+      )
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['projectCaptions', variables.projectId] })

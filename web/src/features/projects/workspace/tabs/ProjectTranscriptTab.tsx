@@ -46,10 +46,10 @@ export const ProjectTranscriptTab: React.FC = () => {
   const [isContentLoading, setIsContentLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const playerRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
-  
+
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState<TranscriptContent | null>(null)
-  
+
   const updateTranscript = useUpdateTranscript()
   const generateCaptionsFromTranscript = useGenerateCaptionsFromTranscript()
 
@@ -130,7 +130,6 @@ export const ProjectTranscriptTab: React.FC = () => {
       }
     } else {
       setContent(null)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsContentLoading(false)
     }
   }, [transcriptInfo?.blobUrl])
@@ -172,7 +171,7 @@ export const ProjectTranscriptTab: React.FC = () => {
       await updateTranscript.mutateAsync({
         projectId: project.id,
         transcriptId: transcriptInfo.id,
-        content: editedContent
+        content: editedContent,
       })
       toast.success('Transcript draft saved successfully!', { id: toastId })
       setContent(editedContent)
@@ -191,7 +190,7 @@ export const ProjectTranscriptTab: React.FC = () => {
       await generateCaptionsFromTranscript.mutateAsync({
         projectId: project.id,
         transcriptId: transcriptInfo.id,
-        content: content
+        content: content,
       })
       toast.success('Caption files (.srt / .vtt) successfully regenerated!', { id: toastId })
     } catch (err: unknown) {

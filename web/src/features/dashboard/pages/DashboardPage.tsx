@@ -8,7 +8,7 @@ import { StatusBadge } from '@/shared/components/ui/StatusBadge'
 import { LoadingSpinner } from '@/shared/components/ui/LoadingSpinner'
 import { useProjects } from '@/shared/services/api/projects'
 import { ErrorState } from '@/shared/components/ui/ErrorState'
-import { useAuth } from '@/features/auth/context/AuthContext'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate()
@@ -72,7 +72,10 @@ export const DashboardPage: React.FC = () => {
       />
 
       {/* Statistics Cards Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+      <div
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-slide-up"
+        style={{ animationDelay: '0.1s' }}
+      >
         {stats.map((stat, i) => (
           <DashboardCard
             key={i}
@@ -86,7 +89,10 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Main Grid content: Recent Projects & Sidebar Activities */}
-      <div className="grid gap-6 lg:grid-cols-3 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+      <div
+        className="grid gap-6 lg:grid-cols-3 animate-slide-up"
+        style={{ animationDelay: '0.2s' }}
+      >
         {/* Left Column: Recent Projects Table */}
         <div className="lg:col-span-2 space-y-6">
           <SectionCard
