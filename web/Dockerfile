@@ -1,25 +1,13 @@
-FROM node:20-alpine
-
-# Set working directory
+# Stage 1: Build static React production bundle
+FROM node:20-alpine AS build
 WORKDIR /app
-
-# Copy package.json and package-lock.json
 COPY package*.json ./
-
-# Install dependencies
 RUN npm ci
-
-# Copy the rest of the application code
 COPY . .
+RUN npm run build
 
-# Ensure /app is owned by the node user
-RUN chown -R node:node /app
-
-# Switch to the node user
-USER node
-
-# Expose Vite's default dev server port
-EXPOSE 5173
-
-# Command to run Vite in dev mode, bound to all network interfaces
-CMD ["npm", "run", "dev", "--", "--host"]
+# Stage 2: Serve static files with Nginx
+FROM nginx:1.25-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
