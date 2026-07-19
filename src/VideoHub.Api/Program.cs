@@ -26,7 +26,7 @@ builder.Services.AddCors(options =>
         var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
             ?? builder.Configuration.GetValue<string>("Cors:AllowedOrigins")
                 ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            ?? new[] { "http://localhost:5173", "http://localhost:3000", "https://videohub-ai-frontend.vercel.app" };
+            ?? new[] { "http://localhost:5173", "http://localhost:3000", "https://videohub-ai-frontend-36yrzyq4a-nikhils-projects-e5412607.vercel.app" };
 
         policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
