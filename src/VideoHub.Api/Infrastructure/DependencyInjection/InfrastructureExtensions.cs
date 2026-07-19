@@ -83,7 +83,13 @@ public static class InfrastructureExtensions
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString, npgsqlOptions =>
-                npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
+            {
+                npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
+                npgsqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(10),
+                    errorCodesToAdd: null);
+            }));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IProjectRepository, ProjectRepositoryService>();
