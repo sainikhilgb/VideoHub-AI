@@ -23,24 +23,15 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", policy =>
     {
-        if (builder.Environment.IsDevelopment())
-        {
-            policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();
-        }
-        else
-        {
-            var allowedOrigins = builder.Configuration.GetValue<string>("Cors:AllowedOrigins")
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? builder.Configuration.GetValue<string>("Cors:AllowedOrigins")
                 ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                ?? new[] { "http://localhost:5173", "http://localhost:3000" };
+            ?? new[] { "http://localhost:5173", "http://localhost:3000", "https://videohub-ai-frontend.vercel.app" };
 
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();
-        }
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 builder.Services.AddEndpointsApiExplorer();
