@@ -1,17 +1,28 @@
 # VideoHub AI
 
-VideoHub AI is a modular-monolith ASP.NET Core backend for automated transcription, captioning, translation, and background job processing.
+[![C#](https://img.shields.io/badge/C%23-178600?style=for-the-badge&logo=c-sharp&logoColor=white)](https://learn.microsoft.com/en-us/dotnet/csharp/)
+[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-The current solution focuses on the Phase 1 infrastructure foundation:
-- ASP.NET Core Web API
-- PostgreSQL with EF Core
-- Redis cache abstraction
-- Hangfire background processing
-- Serilog structured logging
-- OpenTelemetry tracing and metrics
-- FluentValidation
-- Problem Details error responses
-- Local `.env`-based configuration loading
+VideoHub AI is a complete full-stack web application and processing pipeline for automated transcription, captioning, translation, and background job handling. Built on a modular monorepo architecture, the application is divided into three key services:
+
+1. **Backend API (`src/`)**: A modular monolith ASP.NET Core Web API handling authentication, project metadata management, and background job scheduling.
+2. **AI Worker (`ai/`)**: A stateless FastAPI service utilizing `faster-whisper` for machine learning transcript generation.
+3. **Web Interface (`web/`)**: A modern React SPA built with Vite for managing projects, uploads, and editing subtitles.
+
+---
+
+## Key Infrastructure Features (Phase 1)
+- **ASP.NET Core Web API**: Structured as a clean architecture modular monolith.
+- **Relational Persistence**: PostgreSQL database mapping via EF Core.
+- **Distributed Caching**: Redis cache abstraction layer.
+- **Background Jobs**: Hangfire queue management with persistent PostgreSQL state storage.
+- **Structured Observability**: Serilog logging, RFC 7807 Problem Details responses, and OpenTelemetry instrumentation.
+- **Validation**: Strict request validation using FluentValidation.
+- **Secrets Management**: Configuration integration utilizing environment-specific local `.env` files.
 
 ## Solution Overview
 
@@ -140,60 +151,40 @@ The current data model supports the transcription workflow:
 - `Job` tracks background work
 - `AuditLog` is reserved for security/audit events
 
-## Existing API Endpoints
+## API Reference & Documentation
 
-### Health
-- `GET /api/health`
-  - Returns application health status
+Detailed endpoint documentation, request/response schemas, and interactive testing tools are available via Swagger UI.
 
-### Authentication & Identity
-- `POST /api/v1/auth/register`
-  - Register a new user account with secure password complexity checks.
-- `POST /api/v1/auth/login`
-  - Authenticate credentials. Returns a short-lived JSON Web Token (JWT) in the response body and writes a secure, `HttpOnly`, `SameSite=Lax` refresh token cookie.
-- `POST /api/v1/auth/refresh`
-  - Rotates refresh session cookies and issues a new memory-bound JWT access token.
-- `POST /api/v1/auth/logout`
-  - Revokes refresh tokens in the database and cleans up browser cookies.
-- `GET /api/v1/auth/me`
-  - Retrieves the active user's profile details. Requires Bearer JWT authentication header.
+* **Swagger UI URL (Local):** `http://localhost:5000/swagger` or `https://localhost:5001/swagger`
+* **OpenAPI Specification (JSON):** `http://localhost:5000/swagger/v1/swagger.json`
 
-### Projects
-- `GET /api/v1/projects`
-  - Retrieve list of projects belonging *only* to the authenticated user.
-- `GET /api/v1/projects/{id}`
-  - Retrieve a user-owned project by its unique ID (403 Forbidden on non-owned projects).
-- `POST /api/v1/projects`
-  - Create a new project assigned directly to the authenticated user.
-- `PUT /api/v1/projects/{id}`
-  - Update details of a user-owned project (403 Forbidden on non-owned projects).
-- `DELETE /api/v1/projects/{id}`
-  - Delete a user-owned project (403 Forbidden on non-owned projects).
+### API Architecture Overview
 
-### Media Upload
-- `POST /api/v1/projects/{projectId}/media`
-  - Accepts `multipart/form-data` with files. Requires project ownership.
-  - Uploads video/audio files to the configured blob storage provider (Local/Supabase).
-  - Stores metadata in PostgreSQL.
-  - Creates a processing job record.
-  - Enqueues a Hangfire media-processing placeholder job.
-  - Returns `202 Accepted`.
+The API is organized into the following core functional modules:
 
-### Transcripts & Captions
-- `PUT /api/v1/projects/{projectId}/transcript/{transcriptId}`
-  - Updates the speech transcript JSON without regenerating captions.
-- `POST /api/v1/projects/{projectId}/transcript/{transcriptId}/generate-captions`
-  - Explicitly generates new caption files (.srt, .vtt) from a given transcript JSON payload.
+| Module | Base Path | Description | Key Features |
+| :--- | :--- | :--- | :--- |
+| **Health Check** | `/api/health` | Service status checks | Health monitoring |
+| **Authentication** | `/api/v1/auth` | Identity & session management | JWT login, secure cookie refresh, registration, profiles |
+| **Projects** | `/api/v1/projects` | User workspace organization | CRUD project resources isolated by authenticated user |
+| **Media Upload** | `/api/v1/projects/{id}/media` | Media ingestion pipeline | Chunked/multipart uploads, background job dispatch |
+| **Transcripts** | `/api/v1/projects/{id}/transcript` | Transcript & caption services | JSON editing, SRT/VTT generation |
+| **Background Jobs** | `/api/jobs` | Background task orchestration | Hangfire trigger test endpoints |
 
-### Background Jobs
-- `POST /api/jobs/hello-world`
-  - Queues a fire-and-forget Hangfire job, returns `202 Accepted`
-- `POST /api/jobs/hello-world/delayed/{delaySeconds}`
-  - Queues a delayed Hangfire job, returns `202 Accepted`
-- `POST /api/jobs/hello-world/recurring`
-  - Registers a recurring Hangfire job, returns `202 Accepted`
-- `POST /api/jobs/hello-world/continuation`
-  - Queues a continuation job chain, returns `202 Accepted`
+### Quick Start API Test
+
+To quickly verify API connectivity after starting the application:
+
+1. **Authenticate** to receive a JWT access token:
+   ```bash
+   curl -X POST http://localhost:5000/api/v1/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email": "user@example.com", "password": "SecurePassword123!"}'
+   ```
+2. **Access a Protected Endpoint** using the returned token:
+   ```bash
+   curl -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" http://localhost:5000/api/v1/projects
+   ```
 
 ## Hangfire
 
