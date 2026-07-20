@@ -105,7 +105,7 @@ public sealed class ProjectController : ControllerBase
                 return NotFound($"No transcript found for project '{projectId}', language '{language}', version '{version}'.");
 
             var responseUrl = transcript.BlobUrl;
-            if (!string.IsNullOrEmpty(responseUrl) && responseUrl.Contains("/storage/v1/object/authenticated/"))
+            if (!string.IsNullOrEmpty(responseUrl) && (responseUrl.Contains("/storage/v1/object/authenticated/") || responseUrl.Contains("/storage/v1/object/public/")))
             {
                 responseUrl = await blobStorage.GetSignedUrlAsync(responseUrl, TimeSpan.FromHours(1), cancellationToken);
                 if (string.IsNullOrEmpty(responseUrl))
@@ -142,7 +142,7 @@ public sealed class ProjectController : ControllerBase
                 try
                 {
                     var responseUrl = t.BlobUrl;
-                    if (!string.IsNullOrEmpty(responseUrl) && responseUrl.Contains("/storage/v1/object/authenticated/"))
+                    if (!string.IsNullOrEmpty(responseUrl) && (responseUrl.Contains("/storage/v1/object/authenticated/") || responseUrl.Contains("/storage/v1/object/public/")))
                     {
                         responseUrl = await blobStorage.GetSignedUrlAsync(responseUrl, TimeSpan.FromHours(1), cancellationToken);
                     }
@@ -160,7 +160,7 @@ public sealed class ProjectController : ControllerBase
             foreach (var r in results)
             {
                 var url = r.Url;
-                if (!string.IsNullOrEmpty(r.Transcript.BlobUrl) && r.Transcript.BlobUrl.Contains("/storage/v1/object/authenticated/") && string.IsNullOrEmpty(url))
+                if (!string.IsNullOrEmpty(r.Transcript.BlobUrl) && (r.Transcript.BlobUrl.Contains("/storage/v1/object/authenticated/") || r.Transcript.BlobUrl.Contains("/storage/v1/object/public/")) && string.IsNullOrEmpty(url))
                 {
                     return StatusCode(StatusCodes.Status502BadGateway, "Unable to access one or more private storage assets.");
                 }
