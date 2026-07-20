@@ -13,7 +13,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
+# Create a non-root user 
 RUN groupadd -r appuser && useradd -r -g appuser -m appuser
 
 # Copy requirements file and install dependencies
