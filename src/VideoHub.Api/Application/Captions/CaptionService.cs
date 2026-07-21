@@ -1,12 +1,14 @@
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using VideoHub.Api.Application.Exceptions;
 using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Domain.Jobs;
 using VideoHub.Api.Domain.Media;
 using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Infrastructure.Authentication;
 using VideoHub.Api.Infrastructure.Persistence;
 
 namespace VideoHub.Api.Application.Captions;
@@ -21,6 +23,7 @@ public sealed class CaptionService : ICaptionService
     private readonly IHttpClientFactory httpClientFactory;
     private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor;
     private readonly IConfiguration configuration;
+    private readonly IHostEnvironment environment;
     private readonly ILogger<CaptionService> logger;
     private readonly AppDbContext dbContext;
 
@@ -33,6 +36,7 @@ public sealed class CaptionService : ICaptionService
         IHttpClientFactory httpClientFactory,
         Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
+        IHostEnvironment environment,
         ILogger<CaptionService> logger,
         AppDbContext dbContext)
     {
@@ -44,6 +48,7 @@ public sealed class CaptionService : ICaptionService
         this.httpClientFactory = httpClientFactory;
         this.httpContextAccessor = httpContextAccessor;
         this.configuration = configuration;
+        this.environment = environment;
         this.logger = logger;
         this.dbContext = dbContext;
     }
@@ -61,6 +66,9 @@ public sealed class CaptionService : ICaptionService
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        var callbackSecret = AiCallbackSecretResolver.ResolveSecret(configuration, environment)
+            ?? throw new InvalidOperationException("Configuration 'AiService:CallbackSecret' is missing or blank.");
+
         logger.LogInformation("Caption Dispatch Started: JobId={JobId} Languages={Languages}", jobId, string.Join(",", targetLanguages));
 
         var languageTargets = new List<LanguageTarget>();
@@ -124,7 +132,6 @@ public sealed class CaptionService : ICaptionService
             requestId = Guid.NewGuid().ToString();
         }
 
-        var callbackSecret = configuration["AiService:CallbackSecret"] ?? "VideoHubAI_Secure_Callback_Secret_2026";
         var request = new AiProcessRequest
         {
             JobId = jobId,
