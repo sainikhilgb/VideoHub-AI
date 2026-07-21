@@ -5,10 +5,12 @@ using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Domain.Jobs;
 using VideoHub.Api.Domain.Media;
 using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Infrastructure.Authentication;
 using VideoHub.Api.Infrastructure.Persistence;
 using System.Net.Http;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
 
 namespace VideoHub.Api.Application.BackgroundJobs;
@@ -26,6 +28,7 @@ public sealed class BackgroundJobService : IBackgroundJobService
     private readonly IBlobStorage blobStorage;
     private readonly IHttpClientFactory httpClientFactory;
     private readonly IConfiguration configuration;
+    private readonly IHostEnvironment environment;
     private readonly ILogger<BackgroundJobService> logger;
 
     public BackgroundJobService(
@@ -40,6 +43,7 @@ public sealed class BackgroundJobService : IBackgroundJobService
         IBlobStorage blobStorage,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
+        IHostEnvironment environment,
         ILogger<BackgroundJobService> logger)
     {
         this.backgroundJobClient = backgroundJobClient;
@@ -53,6 +57,7 @@ public sealed class BackgroundJobService : IBackgroundJobService
         this.blobStorage = blobStorage;
         this.httpClientFactory = httpClientFactory;
         this.configuration = configuration;
+        this.environment = environment;
         this.logger = logger;
     }
 
@@ -256,11 +261,8 @@ public sealed class BackgroundJobService : IBackgroundJobService
                 throw new Exception("Failed to generate signed URLs for media or subtitle track.");
             }
 
-            var callbackSecret = configuration["AiService:CallbackSecret"];
-            if (string.IsNullOrWhiteSpace(callbackSecret))
-            {
-                throw new InvalidOperationException("Configuration 'AiService:CallbackSecret' is missing or blank.");
-            }
+            var callbackSecret = AiCallbackSecretResolver.ResolveSecret(configuration, environment)
+                ?? throw new InvalidOperationException("Configuration 'AiService:CallbackSecret' is missing or blank.");
 
             var callbackUrl = $"/api/v1/combined-media/{combinedMediaId}/status";
 

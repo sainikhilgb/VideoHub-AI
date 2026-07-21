@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using VideoHub.Api.Application.Captions;
 using VideoHub.Api.Application.CurrentUser;
 using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Infrastructure.Authentication;
 using VideoHub.Api.Domain.Entities;
 
 namespace VideoHub.Api.Api.Controllers;
@@ -51,9 +53,15 @@ public sealed class JobsController : ControllerBase
         Guid jobId,
         [FromBody] AiProcessCallbackDto dto,
         [FromQuery] string? secret,
+        [FromServices] IHostEnvironment environment,
         CancellationToken cancellationToken)
     {
-        var expectedSecret = configuration["AiService:CallbackSecret"] ?? "VideoHubAI_Secure_Callback_Secret_2026";
+        var expectedSecret = AiCallbackSecretResolver.ResolveSecret(configuration, environment);
+        if (string.IsNullOrEmpty(expectedSecret))
+        {
+            logger.LogError("Callback secret is not configured in the host environment.");
+            return StatusCode(StatusCodes.Status500InternalServerError, "Callback secret is not configured.");
+        }
 
         if (string.IsNullOrEmpty(secret))
         {

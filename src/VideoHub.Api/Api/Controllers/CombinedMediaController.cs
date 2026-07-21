@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using VideoHub.Api.Domain.Entities;
 using VideoHub.Api.Application.BackgroundJobs;
 using VideoHub.Api.Infrastructure.Abstractions;
+using VideoHub.Api.Infrastructure.Authentication;
 using VideoHub.Api.Infrastructure.Persistence;
 using VideoHub.Api.Application.CurrentUser;
 using System.Threading;
@@ -23,6 +25,7 @@ public sealed class CombinedMediaController : ControllerBase
     private readonly IRepository<Project> projectRepository;
     private readonly ICurrentUserService currentUserService;
     private readonly IBlobStorage blobStorage;
+    private readonly IBackgroundJobService backgroundJobService;
     private readonly ILogger<CombinedMediaController> logger;
 
     public CombinedMediaController(
@@ -30,12 +33,14 @@ public sealed class CombinedMediaController : ControllerBase
         IRepository<Project> projectRepository,
         ICurrentUserService currentUserService,
         IBlobStorage blobStorage,
+        IBackgroundJobService backgroundJobService,
         ILogger<CombinedMediaController> logger)
     {
         this.dbContext = dbContext;
         this.projectRepository = projectRepository;
         this.currentUserService = currentUserService;
         this.blobStorage = blobStorage;
+        this.backgroundJobService = backgroundJobService;
         this.logger = logger;
     }
 
@@ -189,11 +194,17 @@ public sealed class CombinedMediaController : ControllerBase
         Guid id,
         [FromBody] CombinedMediaCallbackDto dto,
         [FromServices] IConfiguration configuration,
+        [FromServices] IHostEnvironment environment,
         CancellationToken cancellationToken)
     {
         logger.LogInformation("Combined Media Status Callback: Id={Id} Status={Status}", id, dto.Status);
 
-        var callbackSecret = configuration["AiService:CallbackSecret"] ?? "VideoHubAI_Secure_Callback_Secret_2026";
+        var callbackSecret = AiCallbackSecretResolver.ResolveSecret(configuration, environment);
+        if (string.IsNullOrWhiteSpace(callbackSecret))
+        {
+            logger.LogError("AiService:CallbackSecret is not configured. Callback rejected.");
+            return StatusCode(StatusCodes.Status500InternalServerError, "Server authorization config is missing.");
+        }
 
         if (!Request.Headers.TryGetValue("Authorization", out var authHeader) || 
             !authHeader.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
