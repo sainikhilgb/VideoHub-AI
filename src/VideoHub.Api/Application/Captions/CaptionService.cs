@@ -66,6 +66,9 @@ public sealed class CaptionService : ICaptionService
         string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
+        var callbackSecret = AiCallbackSecretResolver.ResolveSecret(configuration, environment)
+            ?? throw new InvalidOperationException("Configuration 'AiService:CallbackSecret' is missing or blank.");
+
         logger.LogInformation("Caption Dispatch Started: JobId={JobId} Languages={Languages}", jobId, string.Join(",", targetLanguages));
 
         var languageTargets = new List<LanguageTarget>();
@@ -129,8 +132,6 @@ public sealed class CaptionService : ICaptionService
             requestId = Guid.NewGuid().ToString();
         }
 
-        var callbackSecret = AiCallbackSecretResolver.ResolveSecret(configuration, environment)
-            ?? throw new InvalidOperationException("Configuration 'AiService:CallbackSecret' is missing or blank.");
         var request = new AiProcessRequest
         {
             JobId = jobId,
