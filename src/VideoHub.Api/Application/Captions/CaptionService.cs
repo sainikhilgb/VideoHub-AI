@@ -288,6 +288,7 @@ public sealed class CaptionService : ICaptionService
         var latestJob = allJobs
             .Where(j => j.ProjectId == projectId)
             .OrderByDescending(j => j.StartedAt ?? DateTimeOffset.MinValue)
+            .ThenByDescending(j => j.Id)
             .FirstOrDefault();
 
         if (latestJob is null)
