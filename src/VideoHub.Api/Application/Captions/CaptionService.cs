@@ -285,11 +285,19 @@ public sealed class CaptionService : ICaptionService
         CancellationToken cancellationToken = default)
     {
         var allJobs = await jobRepository.ListAsync(cancellationToken);
-        var projectJobIds = allJobs.Where(j => j.ProjectId == projectId).Select(j => j.Id).ToHashSet();
+        var latestJob = allJobs
+            .Where(j => j.ProjectId == projectId)
+            .OrderByDescending(j => j.StartedAt ?? DateTimeOffset.MinValue)
+            .FirstOrDefault();
+
+        if (latestJob is null)
+        {
+            return Array.Empty<ProjectCaptionResponseDto>();
+        }
 
         var allCaptionFiles = await captionFileRepository.ListAsync(cancellationToken);
         var projectCaptions = allCaptionFiles
-            .Where(cf => cf.JobId.HasValue && projectJobIds.Contains(cf.JobId.Value))
+            .Where(cf => cf.JobId.HasValue && cf.JobId.Value == latestJob.Id)
             .Select(cf => new ProjectCaptionResponseDto
             {
                 Id = cf.Id,
