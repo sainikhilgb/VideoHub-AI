@@ -88,6 +88,7 @@ public sealed class ProjectController : ControllerBase
         [FromServices] AppDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
         [FromServices] IBlobStorage blobStorage,
+        [FromServices] IConfiguration configuration,
         CancellationToken cancellationToken)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
@@ -102,7 +103,36 @@ public sealed class ProjectController : ControllerBase
                 .FirstOrDefaultAsync(t => t.ProjectId == projectId && t.Language == language && t.Version == version.Value, cancellationToken);
 
             if (transcript is null)
-                return NotFound($"No transcript found for project '{projectId}', language '{language}', version '{version}'.");
+            {
+                // Self-Healing Fallback: Check if the file already exists in Supabase storage
+                var expectedPath = $"{project.UserId}/{projectId}/transcripts/transcript.json";
+                var signedUrl = await blobStorage.GetSignedUrlAsync(expectedPath, TimeSpan.FromHours(1), cancellationToken);
+
+                if (!string.IsNullOrEmpty(signedUrl))
+                {
+                    // The file exists! Automatically create the database row.
+                    var supabaseUrl = configuration["BlobStorage:SupabaseUrl"]?.TrimEnd('/');
+                    var bucket = configuration["BlobStorage:BucketName"] ?? "media";
+                    
+                    transcript = new Transcript
+                    {
+                        Id = Guid.NewGuid(),
+                        ProjectId = projectId,
+                        Language = language,
+                        Status = "Completed",
+                        Version = version.Value,
+                        BlobUrl = !string.IsNullOrEmpty(supabaseUrl)
+                            ? $"{supabaseUrl}/storage/v1/object/authenticated/{bucket}/{expectedPath}"
+                            : expectedPath
+                    };
+                    await dbContext.Transcripts.AddAsync(transcript, cancellationToken);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                }
+                else
+                {
+                    return NotFound($"No transcript found for project '{projectId}', language '{language}', version '{version}'.");
+                }
+            }
 
             var responseUrl = transcript.BlobUrl;
             if (!string.IsNullOrEmpty(responseUrl) && (responseUrl.Contains("/storage/v1/object/authenticated/") || responseUrl.Contains("/storage/v1/object/public/")))
