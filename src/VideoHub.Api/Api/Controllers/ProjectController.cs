@@ -88,6 +88,7 @@ public sealed class ProjectController : ControllerBase
         [FromServices] AppDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
         [FromServices] IBlobStorage blobStorage,
+        [FromServices] IConfiguration configuration,
         CancellationToken cancellationToken)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
@@ -102,10 +103,66 @@ public sealed class ProjectController : ControllerBase
                 .FirstOrDefaultAsync(t => t.ProjectId == projectId && t.Language == language && t.Version == version.Value, cancellationToken);
 
             if (transcript is null)
-                return NotFound($"No transcript found for project '{projectId}', language '{language}', version '{version}'.");
+            {
+                // Only self-heal for the original transcript (version 1 in the project's original language)
+                if (string.Equals(language, project.OriginalLanguage, StringComparison.OrdinalIgnoreCase) && version.Value == 1)
+                {
+                    // Check if the file already exists in storage
+                    var expectedPath = $"{project.UserId}/{projectId}/transcripts/transcript.json";
+                    var signedUrl = await blobStorage.GetSignedUrlAsync(expectedPath, TimeSpan.FromHours(1), cancellationToken);
+
+                    if (!string.IsNullOrEmpty(signedUrl))
+                    {
+                        var supabaseUrl = configuration["BlobStorage:SupabaseUrl"]?.TrimEnd('/');
+                        var bucket = configuration["BlobStorage:BucketName"] ?? "media";
+
+                        transcript = new Transcript
+                        {
+                            Id = Guid.NewGuid(),
+                            ProjectId = projectId,
+                            Language = language,
+                            Status = "Completed",
+                            Version = version.Value,
+                            BlobUrl = !string.IsNullOrEmpty(supabaseUrl)
+                                ? $"{supabaseUrl}/storage/v1/object/authenticated/{bucket}/{expectedPath}"
+                                : expectedPath
+                        };
+
+                        try
+                        {
+                            await dbContext.Transcripts.AddAsync(transcript, cancellationToken);
+                            await dbContext.SaveChangesAsync(cancellationToken);
+                        }
+                        catch (DbUpdateException)
+                        {
+                            var tracked = dbContext.ChangeTracker.Entries<Transcript>().FirstOrDefault();
+                            if (tracked != null)
+                            {
+                                tracked.State = EntityState.Detached;
+                            }
+
+                            transcript = await dbContext.Transcripts
+                                .FirstOrDefaultAsync(t => t.ProjectId == projectId && t.Language == language && t.Version == version.Value, cancellationToken);
+
+                            if (transcript is null)
+                            {
+                                throw;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        return NotFound($"No transcript found for project '{projectId}', language '{language}', version '{version}'.");
+                    }
+                }
+                else
+                {
+                    return NotFound($"No transcript found for project '{projectId}', language '{language}', version '{version}'.");
+                }
+            }
 
             var responseUrl = transcript.BlobUrl;
-            if (!string.IsNullOrEmpty(responseUrl) && (responseUrl.Contains("/storage/v1/object/authenticated/") || responseUrl.Contains("/storage/v1/object/public/")))
+            if (!string.IsNullOrEmpty(responseUrl))
             {
                 responseUrl = await blobStorage.GetSignedUrlAsync(responseUrl, TimeSpan.FromHours(1), cancellationToken);
                 if (string.IsNullOrEmpty(responseUrl))
@@ -142,7 +199,7 @@ public sealed class ProjectController : ControllerBase
                 try
                 {
                     var responseUrl = t.BlobUrl;
-                    if (!string.IsNullOrEmpty(responseUrl) && (responseUrl.Contains("/storage/v1/object/authenticated/") || responseUrl.Contains("/storage/v1/object/public/")))
+                    if (!string.IsNullOrEmpty(responseUrl))
                     {
                         responseUrl = await blobStorage.GetSignedUrlAsync(responseUrl, TimeSpan.FromHours(1), cancellationToken);
                     }
@@ -160,7 +217,7 @@ public sealed class ProjectController : ControllerBase
             foreach (var r in results)
             {
                 var url = r.Url;
-                if (!string.IsNullOrEmpty(r.Transcript.BlobUrl) && (r.Transcript.BlobUrl.Contains("/storage/v1/object/authenticated/") || r.Transcript.BlobUrl.Contains("/storage/v1/object/public/")) && string.IsNullOrEmpty(url))
+                if (!string.IsNullOrEmpty(r.Transcript.BlobUrl) && string.IsNullOrEmpty(url))
                 {
                     return StatusCode(StatusCodes.Status502BadGateway, "Unable to access one or more private storage assets.");
                 }
