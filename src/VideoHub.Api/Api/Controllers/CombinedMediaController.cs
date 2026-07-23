@@ -88,8 +88,8 @@ public sealed class CombinedMediaController : ControllerBase
             existing.CreatedAt = DateTimeOffset.UtcNow;
 
             await dbContext.SaveChangesAsync(cancellationToken);
-            await BroadcastCombinedMediaUpdateAsync(hubContext, existing, cancellationToken);
             jobService.QueueCombinedMediaJob(existing.Id);
+            await BroadcastCombinedMediaUpdateAsync(hubContext, existing, cancellationToken);
 
             return Accepted(new CombinedMediaResponseDto(existing.Id, existing.ProjectId, existing.MediaFileId, existing.Language, existing.MuxType, existing.Status, null, null, existing.CreatedAt));
         }
@@ -109,6 +109,7 @@ public sealed class CombinedMediaController : ControllerBase
         {
             await dbContext.CombinedMediaFiles.AddAsync(combined, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
+            jobService.QueueCombinedMediaJob(combined.Id);
             await BroadcastCombinedMediaUpdateAsync(hubContext, combined, cancellationToken);
         }
         catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException pgEx && pgEx.SqlState == "23505")
@@ -124,9 +125,9 @@ public sealed class CombinedMediaController : ControllerBase
                 concurrentExisting.BlobUrl = null;
                 concurrentExisting.CreatedAt = DateTimeOffset.UtcNow;
                 await dbContext.SaveChangesAsync(cancellationToken);
+                jobService.QueueCombinedMediaJob(concurrentExisting.Id);
                 await BroadcastCombinedMediaUpdateAsync(hubContext, concurrentExisting, cancellationToken);
 
-                jobService.QueueCombinedMediaJob(concurrentExisting.Id);
                 return Accepted(new CombinedMediaResponseDto(concurrentExisting.Id, concurrentExisting.ProjectId, concurrentExisting.MediaFileId, concurrentExisting.Language, concurrentExisting.MuxType, concurrentExisting.Status, null, null, concurrentExisting.CreatedAt));
             }
             throw;
@@ -303,18 +304,25 @@ public sealed class CombinedMediaController : ControllerBase
         CombinedMedia combined,
         CancellationToken cancellationToken)
     {
-        await hubContext.Clients.Group($"project_{combined.ProjectId}")
-            .SendAsync("ReceiveCombinedMediaUpdate", new
-            {
-                Id = combined.Id,
-                ProjectId = combined.ProjectId,
-                MediaFileId = combined.MediaFileId,
-                Language = combined.Language,
-                MuxType = combined.MuxType,
-                Status = combined.Status,
-                BlobUrl = combined.BlobUrl,
-                Error = combined.Error,
-                CreatedAt = combined.CreatedAt
-            }, cancellationToken);
+        try
+        {
+            await hubContext.Clients.Group($"project_{combined.ProjectId}")
+                .SendAsync("ReceiveCombinedMediaUpdate", new
+                {
+                    Id = combined.Id,
+                    ProjectId = combined.ProjectId,
+                    MediaFileId = combined.MediaFileId,
+                    Language = combined.Language,
+                    MuxType = combined.MuxType,
+                    Status = combined.Status,
+                    BlobUrl = combined.BlobUrl,
+                    Error = combined.Error,
+                    CreatedAt = combined.CreatedAt
+                }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to broadcast combined media update for CombinedMediaId={Id} ProjectId={ProjectId}", combined.Id, combined.ProjectId);
+        }
     }
 }

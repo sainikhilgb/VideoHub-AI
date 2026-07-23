@@ -100,15 +100,28 @@ export const useSignalR = ({
 
     connectionRef.current = connection
 
-    const startConnection = async () => {
-      try {
-        await connection.start()
-        console.log('SignalR connected successfully.')
+    let isDisposed = false
 
-        // Join project-specific WebSocket group
-        await connection.invoke('JoinProjectGroup', projectId)
-      } catch (err) {
-        console.error('Error starting SignalR connection:', err)
+    const startConnection = async () => {
+      let backoffMs = 1000
+      const maxBackoffMs = 16000
+
+      while (connection.state === HubConnectionState.Disconnected && !isDisposed) {
+        try {
+          await connection.start()
+          console.log('SignalR connected successfully.')
+
+          if (!isDisposed) {
+            // Join project-specific WebSocket group
+            await connection.invoke('JoinProjectGroup', projectId)
+          }
+          break
+        } catch (err) {
+          console.warn(`Error starting SignalR connection. Retrying in ${backoffMs}ms:`, err)
+          if (isDisposed) break
+          await new Promise((resolve) => setTimeout(resolve, backoffMs))
+          backoffMs = Math.min(backoffMs * 2, maxBackoffMs)
+        }
       }
     }
 
@@ -121,6 +134,7 @@ export const useSignalR = ({
         queryClient.invalidateQueries({ queryKey: ['projectTranscript', projectId] })
         queryClient.invalidateQueries({ queryKey: ['projectCaptions', projectId] })
         queryClient.invalidateQueries({ queryKey: ['projectCombinedMedia', projectId] })
+        queryClient.invalidateQueries({ queryKey: ['jobStatus'] })
       } catch (err) {
         console.error('Error re-joining project group after reconnect:', err)
       }
@@ -139,6 +153,7 @@ export const useSignalR = ({
     startConnection()
 
     return () => {
+      isDisposed = true
       const stopConnection = async () => {
         if (connection.state === HubConnectionState.Connected) {
           try {
