@@ -1,15 +1,37 @@
 import React from 'react'
 import { useParams, Link, useLocation, Outlet } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { StatusBadge } from '@/shared/components/ui/StatusBadge'
 import { LoadingSpinner } from '@/shared/components/ui/LoadingSpinner'
 import { ErrorState } from '@/shared/components/ui/ErrorState'
 import { useProject } from '@/shared/services/api/projects'
+import { useSignalR } from '@/shared/hooks/useSignalR'
 import clsx from 'clsx'
 
 export const ProjectLayout: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const { data: project, isLoading, isError, refetch } = useProject(projectId)
+
+  useSignalR({
+    projectId,
+    onJobUpdate: (event) => {
+      console.log('SignalR: Received Job Update', event)
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['projectTranscript', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['projectCaptions', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['jobStatus', event.jobId] })
+    },
+    onCaptionFileUpdate: (event) => {
+      console.log('SignalR: Received Caption File Update', event)
+      queryClient.invalidateQueries({ queryKey: ['projectCaptions', projectId] })
+    },
+    onCombinedMediaUpdate: (event) => {
+      console.log('SignalR: Received Combined Media Update', event)
+      queryClient.invalidateQueries({ queryKey: ['projectCombinedMedia', projectId] })
+    },
+  })
 
   if (isLoading) {
     return <LoadingSpinner size="lg" className="min-h-[50vh]" />

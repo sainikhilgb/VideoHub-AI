@@ -34,6 +34,7 @@ public static class ApplicationBuilderExtensions
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
+        app.MapHub<VideoHub.Api.Infrastructure.BackgroundJobs.ProjectHub>("/hubs/projects");
 
         var hangfireSettings = app.Services.GetRequiredService<IOptions<HangfireSettings>>().Value;
         app.MapHangfireDashboard(hangfireSettings.DashboardPath);
