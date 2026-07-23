@@ -17,6 +17,7 @@ VideoHub AI is a complete full-stack web application and processing pipeline for
 
 ## Key Infrastructure Features (Phase 1)
 - **ASP.NET Core Web API**: Structured as a clean architecture modular monolith.
+- **Real-time WebSockets**: Push-based notifications via ASP.NET Core SignalR to sync job status updates and video-combining tasks in real-time.
 - **Relational Persistence**: PostgreSQL database mapping via EF Core.
 - **Distributed Caching**: Redis cache abstraction layer.
 - **Background Jobs**: Hangfire queue management with persistent PostgreSQL state storage.
@@ -170,6 +171,7 @@ The API is organized into the following core functional modules:
 | **Media Upload** | `/api/v1/projects/{id}/media` | Media ingestion pipeline | Chunked/multipart uploads, background job dispatch |
 | **Transcripts** | `/api/v1/projects/{id}/transcript` | Transcript & caption services | JSON editing, SRT/VTT generation |
 | **Background Jobs** | `/api/jobs` | Background task orchestration | Hangfire trigger test endpoints |
+| **Real-time Notifications** | `/hubs/projects` | WebSocket SignalR connection hub | Project workspace group sync, real-time job/subtitle updates |
 
 ### Quick Start API Test
 
