@@ -20,6 +20,7 @@ export const ProjectLayout: React.FC = () => {
       console.log('SignalR: Received Job Update', event)
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projectTranscript', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['projectCaptions', projectId] })
       queryClient.invalidateQueries({ queryKey: ['jobStatus', event.jobId] })
     },
     onCaptionFileUpdate: (event) => {

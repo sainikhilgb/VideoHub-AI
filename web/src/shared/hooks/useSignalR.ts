@@ -5,9 +5,8 @@ import {
   HubConnectionState,
   LogLevel,
 } from '@microsoft/signalr'
-import { getAccessToken } from '@/shared/services/api/client'
-
-import { apiClient } from '@/shared/services/api/client'
+import { useQueryClient } from '@tanstack/react-query'
+import { getAccessToken, apiClient } from '@/shared/services/api/client'
 
 const getHubUrl = (): string => {
   const baseURL = apiClient.defaults.baseURL || ''
@@ -63,7 +62,25 @@ export const useSignalR = ({
   onCaptionFileUpdate,
   onCombinedMediaUpdate,
 }: SignalROptions) => {
+  const queryClient = useQueryClient()
   const connectionRef = useRef<HubConnection | null>(null)
+
+  const onJobUpdateRef = useRef(onJobUpdate)
+  const onCaptionFileUpdateRef = useRef(onCaptionFileUpdate)
+  const onCombinedMediaUpdateRef = useRef(onCombinedMediaUpdate)
+
+  // Keep callback refs up to date
+  useEffect(() => {
+    onJobUpdateRef.current = onJobUpdate
+  }, [onJobUpdate])
+
+  useEffect(() => {
+    onCaptionFileUpdateRef.current = onCaptionFileUpdate
+  }, [onCaptionFileUpdate])
+
+  useEffect(() => {
+    onCombinedMediaUpdateRef.current = onCombinedMediaUpdate
+  }, [onCombinedMediaUpdate])
 
   useEffect(() => {
     if (!projectId) return
@@ -75,7 +92,7 @@ export const useSignalR = ({
 
     const connection = new HubConnectionBuilder()
       .withUrl(hubUrl, {
-        accessTokenFactory: () => token,
+        accessTokenFactory: () => getAccessToken() ?? token,
       })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
@@ -95,15 +112,29 @@ export const useSignalR = ({
       }
     }
 
-    if (onJobUpdate) {
-      connection.on('ReceiveJobUpdate', onJobUpdate)
-    }
-    if (onCaptionFileUpdate) {
-      connection.on('ReceiveCaptionFileUpdate', onCaptionFileUpdate)
-    }
-    if (onCombinedMediaUpdate) {
-      connection.on('ReceiveCombinedMediaUpdate', onCombinedMediaUpdate)
-    }
+    connection.onreconnected(async (connectionId) => {
+      console.log('SignalR reconnected:', connectionId)
+      try {
+        await connection.invoke('JoinProjectGroup', projectId)
+        // Refresh all cached queries to fetch updates missed while offline
+        queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+        queryClient.invalidateQueries({ queryKey: ['projectTranscript', projectId] })
+        queryClient.invalidateQueries({ queryKey: ['projectCaptions', projectId] })
+        queryClient.invalidateQueries({ queryKey: ['projectCombinedMedia', projectId] })
+      } catch (err) {
+        console.error('Error re-joining project group after reconnect:', err)
+      }
+    })
+
+    connection.on('ReceiveJobUpdate', (event: JobUpdateEvent) => {
+      onJobUpdateRef.current?.(event)
+    })
+    connection.on('ReceiveCaptionFileUpdate', (event: CaptionFileUpdateEvent) => {
+      onCaptionFileUpdateRef.current?.(event)
+    })
+    connection.on('ReceiveCombinedMediaUpdate', (event: CombinedMediaUpdateEvent) => {
+      onCombinedMediaUpdateRef.current?.(event)
+    })
 
     startConnection()
 
@@ -121,5 +152,5 @@ export const useSignalR = ({
       }
       stopConnection()
     }
-  }, [projectId, onJobUpdate, onCaptionFileUpdate, onCombinedMediaUpdate])
+  }, [projectId, queryClient])
 }
