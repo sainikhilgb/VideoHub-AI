@@ -161,14 +161,6 @@ export const useJobStatus = (jobId: string | undefined, enabled = false) => {
       return response.data
     },
     enabled: enabled && !!jobId,
-    refetchInterval: (query) => {
-      // Stop polling if job completes or fails
-      const status = query.state.data?.status?.toLowerCase()
-      if (status === 'completed' || status === 'failed') {
-        return false
-      }
-      return 3000 // Poll every 3 seconds
-    },
   })
 }
 
@@ -408,11 +400,6 @@ export const useProjectCombinedMedia = (projectId: string | undefined) => {
       return response.data
     },
     enabled: !!projectId,
-    refetchInterval: (query) => {
-      const data = query.state.data as CombinedMediaResponse[] | undefined
-      const hasProcessing = data?.some((cm) => cm.status === 'Queued' || cm.status === 'Processing')
-      return hasProcessing ? 3000 : false
-    },
   })
 }
 

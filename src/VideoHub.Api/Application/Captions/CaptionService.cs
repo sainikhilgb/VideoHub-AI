@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -9,6 +10,7 @@ using VideoHub.Api.Domain.Jobs;
 using VideoHub.Api.Domain.Media;
 using VideoHub.Api.Infrastructure.Abstractions;
 using VideoHub.Api.Infrastructure.Authentication;
+using VideoHub.Api.Infrastructure.BackgroundJobs;
 using VideoHub.Api.Infrastructure.Persistence;
 
 namespace VideoHub.Api.Application.Captions;
@@ -24,6 +26,7 @@ public sealed class CaptionService : ICaptionService
     private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor;
     private readonly IConfiguration configuration;
     private readonly IHostEnvironment environment;
+    private readonly IHubContext<ProjectHub> hubContext;
     private readonly ILogger<CaptionService> logger;
     private readonly AppDbContext dbContext;
 
@@ -37,6 +40,7 @@ public sealed class CaptionService : ICaptionService
         Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
         IHostEnvironment environment,
+        IHubContext<ProjectHub> hubContext,
         ILogger<CaptionService> logger,
         AppDbContext dbContext)
     {
@@ -49,6 +53,7 @@ public sealed class CaptionService : ICaptionService
         this.httpContextAccessor = httpContextAccessor;
         this.configuration = configuration;
         this.environment = environment;
+        this.hubContext = hubContext;
         this.logger = logger;
         this.dbContext = dbContext;
     }
@@ -110,6 +115,15 @@ public sealed class CaptionService : ICaptionService
         job.Status = JobStatuses.Processing;
         job.StatusMessage = "Dispatched to AI service";
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await hubContext.Clients.Group($"project_{projectId}")
+            .SendAsync("ReceiveJobUpdate", new
+            {
+                JobId = jobId,
+                ProjectId = projectId,
+                Status = JobStatuses.Processing,
+                StatusMessage = "Dispatched to AI service"
+            }, cancellationToken);
 
         // Resolve CorrelationId and RequestId from context if not passed
         string? requestId = null;
@@ -182,6 +196,25 @@ public sealed class CaptionService : ICaptionService
         captionFile.ErrorMessage = errorMessage;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var job = captionFile.JobId.HasValue
+            ? await jobRepository.GetByIdAsync(captionFile.JobId.Value, cancellationToken)
+            : null;
+        if (job != null)
+        {
+            await hubContext.Clients.Group($"project_{job.ProjectId}")
+                .SendAsync("ReceiveCaptionFileUpdate", new
+                {
+                    CaptionFileId = captionFile.Id,
+                    ProjectId = job.ProjectId,
+                    JobId = job.Id,
+                    Format = captionFile.Format,
+                    Language = captionFile.Language,
+                    Status = captionFile.Status,
+                    BlobUrl = captionFile.BlobUrl,
+                    ErrorMessage = captionFile.ErrorMessage
+                }, cancellationToken);
+        }
 
         logger.LogInformation("Caption Status Update Completed: CaptionFileId={CaptionFileId} Status={Status}", captionFileId, status);
     }
@@ -276,6 +309,15 @@ public sealed class CaptionService : ICaptionService
         job.StatusMessage = anyCompleted ? null : "Job failed globally on AI service.";
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await hubContext.Clients.Group($"project_{job.ProjectId}")
+            .SendAsync("ReceiveJobUpdate", new
+            {
+                JobId = job.Id,
+                ProjectId = job.ProjectId,
+                Status = job.Status,
+                StatusMessage = job.StatusMessage
+            }, cancellationToken);
 
         logger.LogInformation("Job Finalization Completed: JobId={JobId} FinalStatus={Status}", jobId, job.Status);
     }

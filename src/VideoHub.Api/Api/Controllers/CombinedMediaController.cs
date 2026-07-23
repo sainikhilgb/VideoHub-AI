@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using VideoHub.Api.Domain.Entities;
@@ -9,6 +10,7 @@ using VideoHub.Api.Infrastructure.Authentication;
 using VideoHub.Api.Infrastructure.Persistence;
 using VideoHub.Api.Application.CurrentUser;
 using System.Threading;
+using VideoHub.Api.Infrastructure.BackgroundJobs;
 
 namespace VideoHub.Api.Api.Controllers;
 
@@ -195,6 +197,7 @@ public sealed class CombinedMediaController : ControllerBase
         [FromBody] CombinedMediaCallbackDto dto,
         [FromServices] IConfiguration configuration,
         [FromServices] IHostEnvironment environment,
+        [FromServices] IHubContext<ProjectHub> hubContext,
         CancellationToken cancellationToken)
     {
         logger.LogInformation("Combined Media Status Callback: Id={Id} Status={Status}", id, dto.Status);
@@ -285,6 +288,21 @@ public sealed class CombinedMediaController : ControllerBase
         }
         
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await hubContext.Clients.Group($"project_{combined.ProjectId}")
+            .SendAsync("ReceiveCombinedMediaUpdate", new
+            {
+                Id = combined.Id,
+                ProjectId = combined.ProjectId,
+                MediaFileId = combined.MediaFileId,
+                Language = combined.Language,
+                MuxType = combined.MuxType,
+                Status = combined.Status,
+                BlobUrl = combined.BlobUrl,
+                Error = combined.Error,
+                CreatedAt = combined.CreatedAt
+            }, cancellationToken);
+
         return NoContent();
     }
 }
