@@ -1,5 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
+import {
+  HubConnection,
+  HubConnectionBuilder,
+  HubConnectionState,
+  LogLevel,
+} from '@microsoft/signalr'
 import { getAccessToken } from '@/shared/services/api/client'
 
 import { apiClient } from '@/shared/services/api/client'
